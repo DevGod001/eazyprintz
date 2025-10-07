@@ -2,43 +2,66 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(request: NextRequest) {
+  console.log("=== Generate Image API Called ===");
+  
   try {
-    const { prompt } = await request.json();
-
-    if (!prompt) {
+    // Parse request body with error handling
+    let body;
+    try {
+      body = await request.json();
+      console.log("Request body:", body);
+    } catch (parseError) {
+      console.error("Failed to parse request body:", parseError);
       return NextResponse.json(
-        { error: "Prompt is required" },
+        { error: "Invalid request format" },
         { status: 400 }
       );
     }
 
-    console.log("Received prompt:", prompt);
+    const { prompt } = body;
 
-    let enhancedPrompt = `${prompt}, DTF print design, vibrant colors, high contrast, clean illustration style, professional quality`;
-
-    // Try to enhance prompt with Gemini, but don't fail if it doesn't work
-    try {
-      if (process.env.GEMINI_API_KEY) {
-        console.log("Attempting Gemini enhancement...");
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-
-        const enhancePromptText = `Convert this into a concise image generation prompt (max 50 words): "${prompt}". Focus on visual style, colors, and DTF printing suitability. Return only the prompt, no explanation.`;
-
-        const result = await model.generateContent(enhancePromptText);
-        const response = await result.response;
-        const geminiPrompt = response.text().trim();
-        if (geminiPrompt && geminiPrompt.length > 10) {
-          enhancedPrompt = `${geminiPrompt}, DTF print ready`;
-          console.log("Gemini enhanced prompt:", enhancedPrompt);
-        }
-      }
-    } catch (geminiError: any) {
-      console.log("Gemini enhancement skipped:", geminiError.message);
-      // Continue with original prompt - this is not critical
+    if (!prompt || typeof prompt !== 'string') {
+      console.error("Invalid prompt:", prompt);
+      return NextResponse.json(
+        { error: "Prompt is required and must be a string" },
+        { status: 400 }
+      );
     }
 
-    // Use Hugging Face Stable Diffusion with enhanced prompt
+    console.log("Processing prompt:", prompt);
+
+    // Start with a basic enhanced prompt
+    let enhancedPrompt = `${prompt}, DTF print design, vibrant colors, high contrast, clean illustration, professional quality`;
+
+    // Try to enhance with Gemini (optional, non-critical)
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (apiKey) {
+        console.log("Enhancing with Gemini...");
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+        const result = await model.generateContent(
+          `Convert this into a concise image prompt (max 40 words): "${prompt}". Focus on visual style and colors. Return only the prompt.`
+        );
+        
+        const response = await result.response;
+        const geminiText = response.text().trim();
+        
+        if (geminiText && geminiText.length > 10 && geminiText.length < 200) {
+          enhancedPrompt = `${geminiText}, DTF print ready`;
+          console.log("Gemini enhanced:", enhancedPrompt);
+        }
+      } else {
+        console.log("No Gemini API key, using basic prompt");
+      }
+    } catch (geminiError: any) {
+      console.log("Gemini skip (non-critical):", geminiError.message);
+    }
+
+    // Generate image with Stable Diffusion
+    console.log("Calling Stable Diffusion...");
+    
     const imageResponse = await fetch(
       "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1",
       {
@@ -47,13 +70,11 @@ export async function POST(request: NextRequest) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          inputs: `${enhancedPrompt}, DTF print design, vibrant colors, high contrast, clean edges, professional quality, sharp details, print-ready, isolated on transparent background, no shadows, flat design optimized for fabric printing`,
+          inputs: `${enhancedPrompt}, t-shirt design, clean background, high quality, detailed, sharp, professional`,
           parameters: {
-            negative_prompt: "blurry, low quality, distorted, ugly, bad anatomy, watermark, signature, messy, grainy, pixelated, jpeg artifacts, noisy background, complex background, shadows, gradients that don't print well",
-            num_inference_steps: 50,
-            guidance_scale: 8.0,
-            width: 1024,
-            height: 1024,
+            negative_prompt: "blurry, low quality, distorted, ugly, messy, watermark, signature, text",
+            num_inference_steps: 30,
+            guidance_scale: 7.5,
           },
         }),
       }
@@ -61,34 +82,44 @@ export async function POST(request: NextRequest) {
 
     if (!imageResponse.ok) {
       const errorText = await imageResponse.text();
-      console.error("Image generation error:", errorText);
+      console.error("Stable Diffusion error:", errorText);
       
-      if (errorText.includes("loading")) {
+      if (errorText.includes("loading") || errorText.includes("warming")) {
         return NextResponse.json(
-          { error: "AI model is warming up. Please try again in 20-30 seconds." },
+          { error: "AI model is loading. Please wait 30 seconds and try again." },
           { status: 503 }
         );
       }
       
       return NextResponse.json(
-        { error: "Failed to generate image. Please try again." },
+        { error: `Image generation failed: ${errorText.substring(0, 100)}` },
         { status: 500 }
       );
     }
 
     const imageBlob = await imageResponse.blob();
+    console.log("Image generated successfully, size:", imageBlob.size);
     
     return new NextResponse(imageBlob, {
+      status: 200,
       headers: {
         "Content-Type": "image/png",
-        "Cache-Control": "no-cache",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
       },
     });
+    
   } catch (error: any) {
-    console.error("Error in image generation:", error);
-    console.error("Error details:", error.message);
+    console.error("=== CRITICAL ERROR ===");
+    console.error("Error:", error);
+    console.error("Message:", error.message);
+    console.error("Stack:", error.stack);
+    
     return NextResponse.json(
-      { error: `Failed to generate image: ${error.message || "Please try again."}` },
+      { 
+        error: "Internal server error",
+        details: error.message,
+        type: error.constructor.name
+      },
       { status: 500 }
     );
   }

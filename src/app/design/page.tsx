@@ -391,7 +391,78 @@ export default function DesignPage() {
           <div className="bg-white rounded-lg shadow-md p-8">
             <h2 className="text-2xl font-bold mb-6">Design Preview</h2>
 
-            {imageUrl ? (
+            {loading && processingType === "generate" ? (
+              /* Loading Animation */
+              <div className="flex items-center justify-center h-96 bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 rounded-lg overflow-hidden relative">
+                <div className="absolute inset-0">
+                  {/* Animated stars */}
+                  <div className="absolute w-1 h-1 bg-white rounded-full animate-twinkle" style={{ top: "20%", left: "10%", animationDelay: "0s" }}></div>
+                  <div className="absolute w-1 h-1 bg-white rounded-full animate-twinkle" style={{ top: "40%", left: "20%", animationDelay: "0.5s" }}></div>
+                  <div className="absolute w-2 h-2 bg-yellow-200 rounded-full animate-twinkle" style={{ top: "60%", left: "80%", animationDelay: "1s" }}></div>
+                  <div className="absolute w-1 h-1 bg-white rounded-full animate-twinkle" style={{ top: "80%", left: "15%", animationDelay: "1.5s" }}></div>
+                  <div className="absolute w-1 h-1 bg-pink-300 rounded-full animate-twinkle" style={{ top: "30%", left: "70%", animationDelay: "2s" }}></div>
+                  <div className="absolute w-1 h-1 bg-white rounded-full animate-twinkle" style={{ top: "50%", left: "90%", animationDelay: "2.5s" }}></div>
+                  <div className="absolute w-2 h-2 bg-blue-200 rounded-full animate-twinkle" style={{ top: "70%", left: "40%", animationDelay: "3s" }}></div>
+                  <div className="absolute w-1 h-1 bg-white rounded-full animate-twinkle" style={{ top: "10%", left: "60%", animationDelay: "0.3s" }}></div>
+                  <div className="absolute w-1 h-1 bg-purple-300 rounded-full animate-twinkle" style={{ top: "90%", left: "70%", animationDelay: "1.2s" }}></div>
+                  <div className="absolute w-1 h-1 bg-white rounded-full animate-twinkle" style={{ top: "25%", left: "45%", animationDelay: "2.7s" }}></div>
+                </div>
+                
+                <div className="relative z-10 text-center px-8">
+                  {/* Animated printing elements */}
+                  <div className="mb-6 relative">
+                    <div className="text-6xl animate-bounce">🎨</div>
+                    <div className="absolute -top-2 -right-2 text-3xl animate-spin-slow">✨</div>
+                    <div className="absolute -bottom-2 -left-2 text-3xl animate-pulse">🖨️</div>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <div className="text-2xl font-bold text-white mb-2 animate-pulse">
+                      Crafting Your Design...
+                    </div>
+                    <div className="text-blue-200 text-sm">
+                      {generatedImages.length === 0 && "Initializing AI galaxy..."}
+                      {generatedImages.length === 1 && "✨ Design 1 of 3 complete!"}
+                      {generatedImages.length === 2 && "🎨 Design 2 of 3 complete!"}
+                      {generatedImages.length >= 3 && "🚀 Almost there..."}
+                    </div>
+                  </div>
+                  
+                  {/* Progress bar */}
+                  <div className="w-64 h-2 bg-gray-700 rounded-full overflow-hidden mx-auto">
+                    <div 
+                      className="h-full bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-full transition-all duration-500"
+                      style={{ width: `${(generatedImages.length / 3) * 100}%` }}
+                    ></div>
+                  </div>
+                  
+                  {/* Floating DTF elements */}
+                  <div className="mt-6 flex justify-center gap-4 text-3xl">
+                    <span className="animate-float" style={{ animationDelay: "0s" }}>👕</span>
+                    <span className="animate-float" style={{ animationDelay: "0.5s" }}>🧥</span>
+                    <span className="animate-float" style={{ animationDelay: "1s" }}>👶</span>
+                  </div>
+                </div>
+                
+                {/* Show generated images as they come in */}
+                {generatedImages.length > 0 && (
+                  <div className="absolute bottom-4 left-4 right-4 flex gap-2 justify-center z-20">
+                    {generatedImages.map((imgUrl, index) => (
+                      <div 
+                        key={index}
+                        className="w-20 h-20 rounded-lg overflow-hidden border-2 border-white shadow-lg animate-scale-in"
+                      >
+                        <img
+                          src={imgUrl}
+                          alt={`Generated ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : imageUrl ? (
               <div>
                 {/* Show generated variations if available */}
                 {generatedImages.length > 0 && !uploadedImage && (

@@ -3,12 +3,38 @@
 import { useState } from "react";
 import Link from "next/link";
 
+type AudienceType = "baby" | "kids" | "adult";
+type MockupType = "tshirt" | "hoodie" | "sweatshirt" | "onesie" | "hat";
+
 export default function DesignPage() {
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [processingType, setProcessingType] = useState<"generate" | "optimize" | "remove-bg" | null>(null);
+  const [showMockup, setShowMockup] = useState(false);
+  const [mockupType, setMockupType] = useState<MockupType>("tshirt");
+  const [detectedAudience, setDetectedAudience] = useState<AudienceType>("adult");
+
+  // Detect audience type from prompt
+  const detectAudience = (promptText: string): AudienceType => {
+    const lowerPrompt = promptText.toLowerCase();
+    
+    // Check for baby-related keywords
+    if (lowerPrompt.match(/\b(baby|infant|newborn|onesie|first|6 months|12 months)\b/)) {
+      return "baby";
+    }
+    
+    // Check for kids-related keywords
+    if (lowerPrompt.match(/\b(kid|kids|child|children|toddler|youth)\b/)) {
+      return "kids";
+    }
+    
+    // Default to adult
+    return "adult";
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -29,37 +55,70 @@ export default function DesignPage() {
     setLoading(true);
     setProcessingType("generate");
     setImageUrl("");
+    setGeneratedImages([]);
+    setSelectedImageIndex(null);
     setUploadedImage(null);
+    setShowMockup(false);
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 90000);
+      // Generate 3 variations
+      const variations = ["", " - variation 1", " - variation 2"];
+      const imageUrls: string[] = [];
 
-      const response = await fetch("/api/generate-image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ prompt }),
-        signal: controller.signal,
-      });
+      for (let i = 0; i < 3; i++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 90000);
 
-      clearTimeout(timeoutId);
+        const variationPrompt = prompt + variations[i];
+        
+        const response = await fetch("/api/generate-image", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ prompt: variationPrompt }),
+          signal: controller.signal,
+        });
 
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        setImageUrl(url);
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          imageUrls.push(url);
+          
+          // Update UI as each image generates
+          setGeneratedImages([...imageUrls]);
+        } else {
+          const data = await response.json();
+          console.error(`Error generating variation ${i + 1}:`, data.error);
+        }
+      }
+
+      if (imageUrls.length > 0) {
+        setGeneratedImages(imageUrls);
+        setSelectedImageIndex(0);
+        setImageUrl(imageUrls[0]);
+        
+        // Detect audience type from prompt
+        const audience = detectAudience(prompt);
+        setDetectedAudience(audience);
+        
+        // Set appropriate default mockup type
+        if (audience === "baby") {
+          setMockupType("onesie");
+        } else {
+          setMockupType("tshirt");
+        }
       } else {
-        const data = await response.json();
-        alert(`Error: ${data.error || "Failed to generate image"}`);
+        alert("Failed to generate any images. Please try again.");
       }
     } catch (error: any) {
       console.error("Image generation error:", error);
       if (error.name === 'AbortError') {
         alert("Request timed out. The AI model may be loading. Please try again.");
       } else {
-        alert("Failed to generate image. Please check your connection and try again.");
+        alert("Failed to generate images. Please check your connection and try again.");
       }
     } finally {
       setLoading(false);
@@ -334,13 +393,288 @@ export default function DesignPage() {
 
             {imageUrl ? (
               <div>
+                {/* Show generated variations if available */}
+                {generatedImages.length > 0 && !uploadedImage && (
+                  <div className="mb-4">
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      Choose Your Favorite Design
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {generatedImages.map((imgUrl, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setSelectedImageIndex(index);
+                            setImageUrl(imgUrl);
+                          }}
+                          className={`border-2 rounded-lg overflow-hidden transition ${
+                            selectedImageIndex === index
+                              ? "border-blue-600 ring-2 ring-blue-300"
+                              : "border-gray-300 hover:border-blue-400"
+                          }`}
+                        >
+                          <img
+                            src={imgUrl}
+                            alt={`Variation ${index + 1}`}
+                            className="w-full h-auto"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Main preview with mockup toggle */}
                 <div className="border-2 border-gray-200 rounded-lg overflow-hidden bg-gray-50 mb-4">
-                  <img
-                    src={imageUrl}
-                    alt="Design preview"
-                    className="w-full h-auto"
-                  />
+                  {showMockup ? (
+                    <div className="relative bg-gray-100 p-4">
+                      <div className="relative mx-auto" style={{ maxWidth: "400px" }}>
+                        {mockupType === "tshirt" && (
+                          <div className="relative">
+                            <div className="w-full bg-white rounded-lg shadow-lg p-8">
+                              <div className="text-center mb-4 text-gray-600">👕 T-Shirt Preview</div>
+                              <div className="relative bg-gray-800 rounded-lg p-8 flex items-center justify-center" style={{ minHeight: "300px" }}>
+                                <img
+                                  src={imageUrl}
+                                  alt="Design on t-shirt"
+                                  className="max-w-full max-h-64 object-contain"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {mockupType === "hoodie" && (
+                          <div className="relative">
+                            <div className="w-full bg-white rounded-lg shadow-lg p-8">
+                              <div className="text-center mb-4 text-gray-600">🧥 Hoodie Preview</div>
+                              <div className="relative bg-gray-700 rounded-lg p-8 flex items-center justify-center" style={{ minHeight: "300px" }}>
+                                <img
+                                  src={imageUrl}
+                                  alt="Design on hoodie"
+                                  className="max-w-full max-h-64 object-contain"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {mockupType === "sweatshirt" && (
+                          <div className="relative">
+                            <div className="w-full bg-white rounded-lg shadow-lg p-8">
+                              <div className="text-center mb-4 text-gray-600">👔 Sweatshirt Preview</div>
+                              <div className="relative bg-gray-600 rounded-lg p-8 flex items-center justify-center" style={{ minHeight: "300px" }}>
+                                <img
+                                  src={imageUrl}
+                                  alt="Design on sweatshirt"
+                                  className="max-w-full max-h-64 object-contain"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {mockupType === "onesie" && (
+                          <div className="relative">
+                            <div className="w-full bg-white rounded-lg shadow-lg p-8">
+                              <div className="text-center mb-4 text-gray-600">👶 Baby Onesie Preview</div>
+                              <div className="relative bg-pink-100 rounded-lg p-8 flex items-center justify-center" style={{ minHeight: "300px" }}>
+                                <img
+                                  src={imageUrl}
+                                  alt="Design on baby onesie"
+                                  className="max-w-full max-h-64 object-contain"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {mockupType === "hat" && (
+                          <div className="relative">
+                            <div className="w-full bg-white rounded-lg shadow-lg p-8">
+                              <div className="text-center mb-4 text-gray-600">🧢 Hat Preview</div>
+                              <div className="relative bg-gray-900 rounded-full p-12 flex items-center justify-center mx-auto" style={{ maxWidth: "280px", height: "280px" }}>
+                                <img
+                                  src={imageUrl}
+                                  alt="Design on hat"
+                                  className="max-w-full max-h-32 object-contain"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <img
+                      src={imageUrl}
+                      alt="Design preview"
+                      className="w-full h-auto"
+                    />
+                  )}
                 </div>
+
+                {/* Mockup type selector */}
+                <div className="mb-4">
+                  <div className="flex gap-2 mb-2">
+                    <button
+                      onClick={() => setShowMockup(!showMockup)}
+                      className={`flex-1 py-2 px-4 rounded-lg font-semibold transition ${
+                        showMockup
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      }`}
+                    >
+                      {showMockup ? "👕 Mockup View" : "🖼️ Design View"}
+                    </button>
+                  </div>
+                  {showMockup && (
+                    <>
+                      {detectedAudience === "baby" ? (
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            onClick={() => setMockupType("onesie")}
+                            className={`py-2 px-3 rounded-lg font-medium transition ${
+                              mockupType === "onesie"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            }`}
+                          >
+                            👶 Onesie
+                          </button>
+                          <button
+                            onClick={() => setMockupType("tshirt")}
+                            className={`py-2 px-3 rounded-lg font-medium transition ${
+                              mockupType === "tshirt"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            }`}
+                          >
+                            👕 Baby Tee
+                          </button>
+                          <button
+                            onClick={() => setMockupType("hoodie")}
+                            className={`py-2 px-3 rounded-lg font-medium transition ${
+                              mockupType === "hoodie"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            }`}
+                          >
+                            🧥 Baby Hoodie
+                          </button>
+                        </div>
+                      ) : detectedAudience === "kids" ? (
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            onClick={() => setMockupType("tshirt")}
+                            className={`py-2 px-3 rounded-lg font-medium transition ${
+                              mockupType === "tshirt"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            }`}
+                          >
+                            👕 Kids Tee
+                          </button>
+                          <button
+                            onClick={() => setMockupType("hoodie")}
+                            className={`py-2 px-3 rounded-lg font-medium transition ${
+                              mockupType === "hoodie"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            }`}
+                          >
+                            🧥 Kids Hoodie
+                          </button>
+                          <button
+                            onClick={() => setMockupType("sweatshirt")}
+                            className={`py-2 px-3 rounded-lg font-medium transition ${
+                              mockupType === "sweatshirt"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            }`}
+                          >
+                            👔 Kids Sweatshirt
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-4 gap-2">
+                          <button
+                            onClick={() => setMockupType("tshirt")}
+                            className={`py-2 px-3 rounded-lg font-medium transition ${
+                              mockupType === "tshirt"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            }`}
+                          >
+                            👕 T-Shirt
+                          </button>
+                          <button
+                            onClick={() => setMockupType("hoodie")}
+                            className={`py-2 px-3 rounded-lg font-medium transition ${
+                              mockupType === "hoodie"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            }`}
+                          >
+                            🧥 Hoodie
+                          </button>
+                          <button
+                            onClick={() => setMockupType("sweatshirt")}
+                            className={`py-2 px-3 rounded-lg font-medium transition ${
+                              mockupType === "sweatshirt"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            }`}
+                          >
+                            👔 Sweatshirt
+                          </button>
+                          <button
+                            onClick={() => setMockupType("hat")}
+                            className={`py-2 px-3 rounded-lg font-medium transition ${
+                              mockupType === "hat"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            }`}
+                          >
+                            🧢 Hat
+                          </button>
+                        </div>
+                      )}
+                      <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-xs text-blue-700">
+                          <strong>💡 Detected:</strong> {detectedAudience === "baby" ? "Baby" : detectedAudience === "kids" ? "Kids" : "Adult"} design - Showing appropriate product sizes
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {!uploadedImage && prompt && (
+                  <div className="mb-4">
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      Edit & Regenerate
+                    </label>
+                    <textarea
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      placeholder="Modify your prompt to regenerate the design..."
+                      rows={4}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-gray-900 placeholder-gray-400"
+                    />
+                    <button
+                      onClick={generateImage}
+                      disabled={loading || !prompt.trim()}
+                      className="w-full mt-2 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {loading && processingType === "generate" ? (
+                        <>
+                          <span className="animate-spin">⏳</span>
+                          Regenerating...
+                        </>
+                      ) : (
+                        <>
+                          🔄 Regenerate 3 New Designs
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   {!uploadedImage && (
@@ -372,9 +706,9 @@ export default function DesignPage() {
                 <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                   <p className="text-sm text-yellow-800">
                     <strong>📋 Next Steps:</strong>
-                    <br />1. Review your design
-                    <br />2. Optimize for best DTF print quality
-                    <br />3. Remove background if needed
+                    <br />1. Review your design variations
+                    <br />2. Preview on mockups to see final look
+                    <br />3. Optimize for best DTF print quality
                     <br />4. Download and send to production
                   </p>
                 </div>

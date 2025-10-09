@@ -26,36 +26,49 @@ export async function POST(request: NextRequest) {
       imageBuffer = Buffer.from(arrayBuffer);
     }
 
-    // Optimize image using Sharp for DTF printing
-    // - Ensure high resolution (300 DPI equivalent)
-    // - Enhance colors and contrast
-    // - Convert to PNG with transparency support
-    const optimizedBuffer = await sharp(imageBuffer)
-      .resize(3000, 3000, {
-        fit: 'inside',
-        withoutEnlargement: false, // Allow upscaling for better print quality
-      })
-      .sharpen() // Enhance sharpness
-      .normalise() // Enhance contrast and brightness
-      .png({
-        compressionLevel: 6, // Good balance of quality and file size
-        adaptiveFiltering: true,
-      })
-      .toBuffer();
+    try {
+      // Optimize image using Sharp for DTF printing
+      // - Ensure high resolution (300 DPI equivalent)
+      // - Enhance colors and contrast
+      // - Convert to PNG with transparency support
+      const optimizedBuffer = await sharp(imageBuffer)
+        .resize(3000, 3000, {
+          fit: 'inside',
+          withoutEnlargement: false, // Allow upscaling for better print quality
+        })
+        .sharpen() // Enhance sharpness
+        .normalise() // Enhance contrast and brightness
+        .png({
+          compressionLevel: 6, // Good balance of quality and file size
+          adaptiveFiltering: true,
+        })
+        .toBuffer();
 
-    console.log("Image optimized successfully for DTF printing");
-    
-    return new NextResponse(optimizedBuffer as any, {
-      headers: {
-        "Content-Type": "image/png",
-        "X-Optimization-Status": "enhanced",
-        "Cache-Control": "no-cache",
-      },
-    });
+      console.log("Image optimized successfully for DTF printing");
+      
+      return new NextResponse(optimizedBuffer as any, {
+        headers: {
+          "Content-Type": "image/png",
+          "X-Optimization-Status": "enhanced",
+          "Cache-Control": "no-cache",
+        },
+      });
+    } catch (sharpError: any) {
+      console.warn("Sharp optimization failed, returning original image:", sharpError.message);
+      
+      // Return original image if optimization fails
+      return new NextResponse(imageBuffer as any, {
+        headers: {
+          "Content-Type": "image/png",
+          "X-Optimization-Status": "original",
+          "Cache-Control": "no-cache",
+        },
+      });
+    }
   } catch (error: any) {
-    console.error("Error optimizing image:", error);
+    console.error("Error in optimize-image route:", error);
     return NextResponse.json(
-      { error: `Failed to optimize image: ${error.message}` },
+      { error: `Failed to process image: ${error.message}` },
       { status: 500 }
     );
   }

@@ -347,6 +347,9 @@ export default function DesignPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ imageUrl: imageData }),
+      }).catch((fetchError) => {
+        console.error('Fetch error:', fetchError);
+        throw new Error(`Network error: ${fetchError.message}. Please ensure the development server is running.`);
       });
 
       console.log('Optimization response status:', response.status);
@@ -361,9 +364,9 @@ export default function DesignPage() {
         // Check if it was actually optimized or just returned original
         const status = response.headers.get('X-Optimization-Status');
         if (status === 'original') {
-          alert('✨ Image processed! (The AI enhancement model is loading, so your original high-quality image is ready for printing.)');
+          alert('✨ Image processed! (Optimization library is loading, your original high-quality image is ready for printing.)');
         } else {
-          alert('✨ Image optimized successfully!');
+          alert('✨ Image optimized successfully for DTF printing!');
         }
       } else {
         const data = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -372,7 +375,7 @@ export default function DesignPage() {
       }
     } catch (error: any) {
       console.error("Optimization error:", error);
-      alert(`Failed to optimize image: ${error.message || 'Please try again.'}`);
+      alert(`Failed to optimize image: ${error.message || 'Network error. Please restart the development server and try again.'}`);
     } finally {
       setLoading(false);
       setProcessingType(null);
@@ -1704,11 +1707,10 @@ export default function DesignPage() {
                     <button
                       onClick={() => {
                         setShowSizeSelection(true);
-                        setShowUnifiedShop(true);
                       }}
                       className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-4 rounded-lg font-bold hover:from-green-700 hover:to-green-800 transition shadow-lg flex items-center justify-center gap-2 text-lg"
                     >
-                      📏 Select Print Size & Shop Apparel
+                      📏 Select Print Size
                     </button>
                   </div>
                 )}
@@ -1918,8 +1920,7 @@ export default function DesignPage() {
                       </button>
                       <button
                         onClick={() => {
-                          setShowSizeSelection(false);
-                          setShowApparelMarketplace(true);
+                          setShowUnifiedShop(true);
                         }}
                         className="bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-lg font-bold hover:from-green-700 hover:to-green-800 transition shadow-lg"
                       >
@@ -1931,13 +1932,13 @@ export default function DesignPage() {
 
                 {/* UNIFIED SHOPPING MODAL - Everything in ONE place */}
                 {showUnifiedShop && (
-                  <div className="fixed inset-0 bg-black bg-opacity-90 z-50 overflow-hidden">
-                    <div className="h-screen flex items-center justify-center p-4">
-                      <div className="w-full max-w-7xl h-[90vh] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
+                  <div className="fixed inset-0 bg-black bg-opacity-90 z-50 overflow-y-auto">
+                    <div className="min-h-screen flex items-center justify-center p-2 md:p-4">
+                      <div className="w-full max-w-7xl bg-white rounded-lg md:rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden my-4">
                         {/* LEFT SIDE - LIVE PREVIEW */}
-                        <div className="w-1/2 bg-gradient-to-br from-gray-900 via-gray-800 to-black p-8 flex flex-col">
-                          <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-white">Live Preview</h2>
+                        <div className="w-full md:w-1/2 bg-gradient-to-br from-gray-900 via-gray-800 to-black p-4 md:p-8 flex flex-col">
+                          <div className="flex justify-between items-center mb-4 md:mb-6">
+                            <h2 className="text-xl md:text-2xl font-bold text-white">Live Preview</h2>
                             <button
                               onClick={() => setShowUnifiedShop(false)}
                               className="text-white hover:text-gray-300 text-3xl font-bold"
@@ -1948,7 +1949,7 @@ export default function DesignPage() {
 
                           {/* Front/Back Toggle */}
                           {selectedApparel && (
-                            <div className="flex gap-2 mb-6">
+                            <div className="flex gap-2 mb-4 md:mb-6">
                               <button
                                 onClick={() => setShowApparelView("front")}
                                 className={`flex-1 py-3 px-4 rounded-lg font-semibold transition ${
@@ -1973,12 +1974,12 @@ export default function DesignPage() {
                           )}
 
                           {/* Live Apparel Preview with Design */}
-                          <div className="flex-1 flex items-center justify-center">
+                          <div className="flex-1 flex items-center justify-center min-h-[300px] md:min-h-0">
                             {selectedApparel ? (
                               <div className="relative">
                                 {/* Apparel Base */}
                                 <div 
-                                  className="w-96 h-96 rounded-2xl shadow-2xl flex items-center justify-center relative overflow-hidden"
+                                  className="w-64 h-64 md:w-96 md:h-96 rounded-xl md:rounded-2xl shadow-2xl flex items-center justify-center relative overflow-hidden"
                                   style={{ 
                                     backgroundColor: selectedApparel.color.toLowerCase() === 'white' ? '#f3f4f6' : 
                                                    selectedApparel.color.toLowerCase() === 'black' ? '#1f2937' :
@@ -1986,7 +1987,7 @@ export default function DesignPage() {
                                   }}
                                 >
                                   {/* Apparel Icon/Shape */}
-                                  <div className="text-9xl opacity-20">
+                                  <div className="text-6xl md:text-9xl opacity-20">
                                     {selectedApparel.type === "tshirt" ? "👕" : 
                                      selectedApparel.type === "hoodie" ? "🧥" : 
                                      selectedApparel.type === "onesie" ? "👶" : "👔"}
@@ -2036,8 +2037,8 @@ export default function DesignPage() {
 
                           {/* Placement Quick Info */}
                           {selectedApparel && (
-                            <div className="mt-6 p-4 bg-gray-800 rounded-lg">
-                              <p className="text-white text-sm">
+                            <div className="mt-4 md:mt-6 p-3 md:p-4 bg-gray-800 rounded-lg">
+                              <p className="text-white text-xs md:text-sm">
                                 <strong>Current View:</strong> {selectedApparel.color} {selectedApparel.name} • Size {selectedApparel.size}
                                 <br />
                                 <strong>Design Placement:</strong> {printPlacement === "front" ? "Front Center" : 
@@ -2049,18 +2050,18 @@ export default function DesignPage() {
                         </div>
 
                         {/* RIGHT SIDE - CUSTOMIZATION CONTROLS */}
-                        <div className="w-1/2 overflow-y-auto p-8">
-                          <h2 className="text-3xl font-bold text-gray-900 mb-6">
+                        <div className="w-full md:w-1/2 overflow-y-auto p-4 md:p-8 max-h-[60vh] md:max-h-none">
+                          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 md:mb-6">
                             🎨 Customize Your Order
                           </h2>
 
                           {/* Step 1: Select Apparel */}
-                          <div className="mb-8">
-                            <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                              <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">1</span>
+                          <div className="mb-6 md:mb-8">
+                            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3 md:mb-4 flex items-center gap-2">
+                              <span className="bg-blue-600 text-white w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">1</span>
                               Choose Apparel
                             </h3>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-2 md:gap-3">
                               {apparelCatalog.map((item) => (
                                 <button
                                   key={item.id}
@@ -2081,11 +2082,11 @@ export default function DesignPage() {
                                       : "border-gray-300 hover:border-blue-400"
                                   }`}
                                 >
-                                  <div className="text-4xl mb-2">
+                                  <div className="text-3xl md:text-4xl mb-2">
                                     {item.type === "tshirt" ? "👕" : item.type === "hoodie" ? "🧥" : item.type === "onesie" ? "👶" : "👔"}
                                   </div>
-                                  <div className="font-bold text-sm text-gray-900">{item.name}</div>
-                                  <div className="text-green-600 font-bold">${item.basePrice}</div>
+                                  <div className="font-bold text-xs md:text-sm text-gray-900">{item.name}</div>
+                                  <div className="text-green-600 font-bold text-sm md:text-base">${item.basePrice}</div>
                                 </button>
                               ))}
                             </div>
@@ -2093,9 +2094,9 @@ export default function DesignPage() {
 
                           {/* Step 2: Select Color */}
                           {selectedApparel && (
-                            <div className="mb-8">
-                              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">2</span>
+                            <div className="mb-6 md:mb-8">
+                              <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3 md:mb-4 flex items-center gap-2">
+                                <span className="bg-blue-600 text-white w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">2</span>
                                 Choose Color
                               </h3>
                               <div className="flex flex-wrap gap-2">
@@ -2103,7 +2104,7 @@ export default function DesignPage() {
                                   <button
                                     key={color}
                                     onClick={() => setSelectedApparel({...selectedApparel, color})}
-                                    className={`px-4 py-2 rounded-lg border-2 transition font-semibold text-sm ${
+                                    className={`px-3 md:px-4 py-2 rounded-lg border-2 transition font-semibold text-xs md:text-sm ${
                                       selectedApparel.color === color
                                         ? "border-blue-600 bg-blue-50 text-blue-900"
                                         : "border-gray-300 hover:border-blue-400 text-gray-900"
@@ -2118,9 +2119,9 @@ export default function DesignPage() {
 
                           {/* Step 3: Select Size */}
                           {selectedApparel && (
-                            <div className="mb-8">
-                              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">3</span>
+                            <div className="mb-6 md:mb-8">
+                              <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3 md:mb-4 flex items-center gap-2">
+                                <span className="bg-blue-600 text-white w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">3</span>
                                 Choose Size
                               </h3>
                               <div className="flex flex-wrap gap-2">
@@ -2128,7 +2129,7 @@ export default function DesignPage() {
                                   <button
                                     key={size}
                                     onClick={() => setSelectedApparel({...selectedApparel, size})}
-                                    className={`px-4 py-2 rounded-lg border-2 transition font-semibold ${
+                                    className={`px-3 md:px-4 py-2 rounded-lg border-2 transition font-semibold text-xs md:text-sm ${
                                       selectedApparel.size === size
                                         ? "border-blue-600 bg-blue-50 text-blue-900"
                                         : "border-gray-300 hover:border-blue-400 text-gray-900"
@@ -2143,12 +2144,12 @@ export default function DesignPage() {
 
                           {/* Step 4: Design Placement */}
                           {selectedApparel && (
-                            <div className="mb-8">
-                              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">4</span>
+                            <div className="mb-6 md:mb-8">
+                              <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3 md:mb-4 flex items-center gap-2">
+                                <span className="bg-blue-600 text-white w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">4</span>
                                 Design Placement
                               </h3>
-                              <div className="grid grid-cols-2 gap-3">
+                              <div className="grid grid-cols-2 gap-2 md:gap-3">
                                 {(["front", "back", "breast-left", "breast-right"] as const).map((placement) => (
                                   <button
                                     key={placement}
@@ -2160,16 +2161,16 @@ export default function DesignPage() {
                                         setShowApparelView("front");
                                       }
                                     }}
-                                    className={`p-4 border-2 rounded-lg transition ${
+                                    className={`p-3 md:p-4 border-2 rounded-lg transition ${
                                       printPlacement === placement
                                         ? "border-blue-600 bg-blue-50"
                                         : "border-gray-300 hover:border-blue-400"
                                     }`}
                                   >
-                                    <div className="text-3xl mb-1">
+                                    <div className="text-2xl md:text-3xl mb-1">
                                       {placement === "front" ? "👉" : placement === "back" ? "👈" : "📌"}
                                     </div>
-                                    <div className="font-semibold text-sm text-gray-900">
+                                    <div className="font-semibold text-xs md:text-sm text-gray-900">
                                       {placement === "front" ? "Front" : 
                                        placement === "back" ? "Back" :
                                        placement === "breast-left" ? "Left Breast" : "Right Breast"}
@@ -2182,15 +2183,15 @@ export default function DesignPage() {
 
                           {/* Step 5: Quantity */}
                           {selectedApparel && (
-                            <div className="mb-8">
-                              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">5</span>
+                            <div className="mb-6 md:mb-8">
+                              <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3 md:mb-4 flex items-center gap-2">
+                                <span className="bg-blue-600 text-white w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">5</span>
                                 Quantity
                               </h3>
-                              <div className="flex items-center border-2 border-gray-300 rounded-lg overflow-hidden bg-white w-48">
+                              <div className="flex items-center border-2 border-gray-300 rounded-lg overflow-hidden bg-white w-full max-w-[200px]">
                                 <button
                                   onClick={() => setSelectedApparel({...selectedApparel, quantity: Math.max(1, selectedApparel.quantity - 1)})}
-                                  className="px-4 py-3 bg-gray-100 hover:bg-gray-200 transition font-bold text-gray-900"
+                                  className="px-3 md:px-4 py-2 md:py-3 bg-gray-100 hover:bg-gray-200 transition font-bold text-gray-900"
                                 >
                                   −
                                 </button>
@@ -2199,11 +2200,11 @@ export default function DesignPage() {
                                   value={selectedApparel.quantity}
                                   onChange={(e) => setSelectedApparel({...selectedApparel, quantity: Math.max(1, parseInt(e.target.value) || 1)})}
                                   min="1"
-                                  className="flex-1 px-4 py-3 text-center focus:outline-none text-gray-900 font-semibold"
+                                  className="flex-1 px-2 md:px-4 py-2 md:py-3 text-center focus:outline-none text-gray-900 font-semibold text-sm md:text-base"
                                 />
                                 <button
                                   onClick={() => setSelectedApparel({...selectedApparel, quantity: selectedApparel.quantity + 1})}
-                                  className="px-4 py-3 bg-gray-100 hover:bg-gray-200 transition font-bold text-gray-900"
+                                  className="px-3 md:px-4 py-2 md:py-3 bg-gray-100 hover:bg-gray-200 transition font-bold text-gray-900"
                                 >
                                   +
                                 </button>
@@ -2213,20 +2214,20 @@ export default function DesignPage() {
 
                           {/* Order Summary & Checkout */}
                           {selectedApparel && (
-                            <div className="border-t pt-6">
-                              <h3 className="text-xl font-bold text-gray-900 mb-4">Order Summary</h3>
-                              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                                <div className="flex justify-between mb-2">
+                            <div className="border-t pt-4 md:pt-6">
+                              <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3 md:mb-4">Order Summary</h3>
+                              <div className="bg-gray-50 rounded-lg p-3 md:p-4 mb-3 md:mb-4">
+                                <div className="flex justify-between mb-2 text-sm md:text-base">
                                   <span>DTF Transfer ({quantity}x)</span>
                                   <span className="font-bold">${pricing.total}</span>
                                 </div>
-                                <div className="flex justify-between mb-2">
-                                  <span>{selectedApparel.name} ({selectedApparel.quantity}x)</span>
+                                <div className="flex justify-between mb-2 text-sm md:text-base">
+                                  <span className="text-sm">{selectedApparel.name} ({selectedApparel.quantity}x)</span>
                                   <span className="font-bold">${(selectedApparel.basePrice * selectedApparel.quantity).toFixed(2)}</span>
                                 </div>
                                 <div className="border-t pt-2 mt-2 flex justify-between items-center">
-                                  <span className="text-lg font-bold">Total:</span>
-                                  <span className="text-2xl font-bold text-green-600">
+                                  <span className="text-base md:text-lg font-bold">Total:</span>
+                                  <span className="text-xl md:text-2xl font-bold text-green-600">
                                     ${(pricing.total + (selectedApparel.basePrice * selectedApparel.quantity)).toFixed(2)}
                                   </span>
                                 </div>
@@ -2236,7 +2237,7 @@ export default function DesignPage() {
                                   setShowUnifiedShop(false);
                                   alert("Proceeding to checkout...");
                                 }}
-                                className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-4 rounded-lg font-bold hover:from-green-700 hover:to-green-800 transition shadow-lg text-lg"
+                                className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 md:py-4 rounded-lg font-bold hover:from-green-700 hover:to-green-800 transition shadow-lg text-base md:text-lg"
                               >
                                 Proceed to Checkout 🛒
                               </button>

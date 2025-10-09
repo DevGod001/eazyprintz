@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import sharp from "sharp";
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,54 +12,69 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Removing background...");
+    console.log("Removing background using Sharp...");
 
-    // Convert data URL to blob
-    let imageBlob: Blob;
+    // Convert data URL to buffer
+    let imageBuffer: Buffer;
     
     if (imageUrl.startsWith('data:')) {
-      const response = await fetch(imageUrl);
-      imageBlob = await response.blob();
+      const base64Data = imageUrl.split(',')[1];
+      imageBuffer = Buffer.from(base64Data, 'base64');
     } else {
       const response = await fetch(imageUrl);
-      imageBlob = await response.blob();
+      const arrayBuffer = await response.arrayBuffer();
+      imageBuffer = Buffer.from(arrayBuffer);
     }
 
-    // Use Hugging Face's background removal model
-    const response = await fetch(
-      "https://api-inference.huggingface.co/models/briaai/RMBG-1.4",
-      {
-        method: "POST",
-        body: imageBlob,
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Background removal error:", errorText);
-      
-      if (errorText.includes("loading") || errorText.includes("currently loading")) {
-        return NextResponse.json(
-          { error: "AI model is warming up. Please wait 30 seconds and try again." },
-          { status: 503 }
-        );
-      }
-      
-      // If background removal fails, return original image
-      console.log("Background removal failed, returning original");
-      return new NextResponse(imageBlob, {
-        headers: {
-          "Content-Type": "image/png",
-          "X-Background-Removed": "failed",
-          "Cache-Control": "no-cache",
-        },
-      });
-    }
-
-    const resultBlob = await response.blob();
-    console.log("Background removed successfully");
+    console.log("Processing image to remove white background...");
     
-    return new NextResponse(resultBlob, {
+    // Process the image with Sharp to make white background transparent
+    // Using the same logic as generate-image route
+    const image = sharp(imageBuffer);
+    const metadata = await image.metadata();
+    
+    console.log("Image metadata:", metadata);
+    
+    // Convert white background to transparent
+    const transparentBuffer = await image
+      .ensureAlpha() // Ensure image has alpha channel
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+      .then(({ data, info }) => {
+        // Process pixels: make white (or near-white) pixels transparent
+        const pixels = new Uint8Array(data);
+        const threshold = 240; // Adjust this value (240-255) for white detection sensitivity
+        
+        let transparentPixels = 0;
+        for (let i = 0; i < pixels.length; i += info.channels) {
+          const r = pixels[i];
+          const g = pixels[i + 1];
+          const b = pixels[i + 2];
+          
+          // If pixel is white or near-white, make it transparent
+          if (r > threshold && g > threshold && b > threshold) {
+            pixels[i + 3] = 0; // Set alpha to 0 (transparent)
+            transparentPixels++;
+          }
+        }
+        
+        console.log(`Made ${transparentPixels} pixels transparent`);
+        
+        // Convert back to image
+        return sharp(pixels, {
+          raw: {
+            width: info.width,
+            height: info.height,
+            channels: info.channels
+          }
+        })
+        .png()
+        .toBuffer();
+      });
+    
+    console.log("Background removed successfully, final size:", transparentBuffer.length);
+    
+    return new NextResponse(transparentBuffer as any, {
       headers: {
         "Content-Type": "image/png",
         "X-Background-Removed": "true",

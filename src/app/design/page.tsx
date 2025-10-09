@@ -57,6 +57,16 @@ export default function DesignPage() {
   const [showFinalPreview, setShowFinalPreview] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showApparelView, setShowApparelView] = useState<"front" | "back">("front");
+  
+  // Magnifying lens state
+  const [showLens, setShowLens] = useState(false);
+  const [lensPosition, setLensPosition] = useState({ x: 0, y: 0 });
+  const [showEnlargedModal, setShowEnlargedModal] = useState(false);
+  
+  // Mockup magnifying lens state
+  const [showMockupLens, setShowMockupLens] = useState(false);
+  const [mockupLensPosition, setMockupLensPosition] = useState({ x: 0, y: 0 });
+  const [showMockupEnlargedModal, setShowMockupEnlargedModal] = useState(false);
 
   // Apparel catalog based on audience
   const getApparelCatalog = () => {
@@ -304,6 +314,18 @@ export default function DesignPage() {
     }
   };
 
+  // Helper function to convert blob URL to base64
+  const blobToBase64 = async (blobUrl: string): Promise<string> => {
+    const response = await fetch(blobUrl);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
   const optimizeForDTF = async () => {
     if (!imageUrl) return;
 
@@ -311,25 +333,46 @@ export default function DesignPage() {
     setProcessingType("optimize");
 
     try {
+      // Convert blob URL to base64 if needed
+      let imageData = imageUrl;
+      if (imageUrl.startsWith('blob:')) {
+        console.log('Converting blob URL to base64...');
+        imageData = await blobToBase64(imageUrl);
+      }
+
+      console.log('Sending optimization request...');
       const response = await fetch("/api/optimize-image", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ imageUrl }),
+        body: JSON.stringify({ imageUrl: imageData }),
       });
+
+      console.log('Optimization response status:', response.status);
 
       if (response.ok) {
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
         setImageUrl(url);
+        // Re-check transparency after optimization
+        checkImageTransparency(url);
+        
+        // Check if it was actually optimized or just returned original
+        const status = response.headers.get('X-Optimization-Status');
+        if (status === 'original') {
+          alert('✨ Image processed! (The AI enhancement model is loading, so your original high-quality image is ready for printing.)');
+        } else {
+          alert('✨ Image optimized successfully!');
+        }
       } else {
-        const data = await response.json();
+        const data = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Optimization error:', data);
         alert(`Error: ${data.error || "Failed to optimize image"}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Optimization error:", error);
-      alert("Failed to optimize image. Please try again.");
+      alert(`Failed to optimize image: ${error.message || 'Please try again.'}`);
     } finally {
       setLoading(false);
       setProcessingType(null);
@@ -343,25 +386,58 @@ export default function DesignPage() {
     setProcessingType("remove-bg");
 
     try {
+      // Convert blob URL to base64 if needed
+      let imageData = imageUrl;
+      if (imageUrl.startsWith('blob:')) {
+        console.log('Converting blob URL to base64...');
+        imageData = await blobToBase64(imageUrl);
+      }
+
+      console.log('Sending background removal request...');
       const response = await fetch("/api/remove-background", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ imageUrl }),
+        body: JSON.stringify({ imageUrl: imageData }),
       });
+
+      console.log('Background removal response status:', response.status);
+      
+      // Check response headers
+      const bgRemovedHeader = response.headers.get('X-Background-Removed');
+      console.log('X-Background-Removed header:', bgRemovedHeader);
 
       if (response.ok) {
         const blob = await response.blob();
+        console.log('Received blob type:', blob.type);
+        console.log('Received blob size:', blob.size);
+        
         const url = URL.createObjectURL(blob);
         setImageUrl(url);
+        
+        // Re-check transparency after background removal
+        checkImageTransparency(url);
+        
+        // Check if background was actually removed
+        if (bgRemovedHeader === 'failed') {
+          alert('⚠️ Background removal failed. The AI model may be loading. Your original image is ready, but try again in 30 seconds for background removal.');
+        } else if (bgRemovedHeader === 'true') {
+          alert('✅ Background removed successfully!');
+        } else {
+          alert('⚠️ Background removal may not have worked. The AI model might be loading. Try again in 30 seconds.');
+        }
+      } else if (response.status === 503) {
+        const data = await response.json().catch(() => ({ error: 'Service temporarily unavailable' }));
+        alert(`⏳ ${data.error || 'The AI model is warming up. Please wait 30 seconds and try again.'}`);
       } else {
-        const data = await response.json();
+        const data = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Background removal error:', data);
         alert(`Error: ${data.error || "Failed to remove background"}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Background removal error:", error);
-      alert("Failed to remove background. Please try again.");
+      alert(`Failed to remove background: ${error.message || 'Please try again.'}`);
     } finally {
       setLoading(false);
       setProcessingType(null);
@@ -509,53 +585,6 @@ export default function DesignPage() {
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <button
-                    onClick={optimizeForDTF}
-                    disabled={loading || !imageUrl}
-                    className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {loading && processingType === "optimize" ? (
-                      <>
-                        <span className="animate-spin">⏳</span>
-                        Optimizing...
-                      </>
-                    ) : (
-                      <>
-                        ⚡ Optimize for DTF
-                      </>
-                    )}
-                  </button>
-
-                  {!hasTransparency && (
-                    <button
-                      onClick={removeBackground}
-                      disabled={loading || !imageUrl}
-                      className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {loading && processingType === "remove-bg" ? (
-                        <>
-                          <span className="animate-spin">⏳</span>
-                          Removing Background...
-                        </>
-                      ) : (
-                        <>
-                          🔲 Remove Background
-                        </>
-                      )}
-                    </button>
-                  )}
-                  
-                  {hasTransparency && (
-                    <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                      <p className="text-sm text-green-800 flex items-center gap-2">
-                        <span className="text-lg">✓</span>
-                        <span><strong>Background removed!</strong> Your design is ready for printing.</span>
-                      </p>
-                    </div>
-                  )}
-                </div>
-
                 <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
                   <p className="text-sm text-green-800">
                     <strong>✨ Optimization Features:</strong>
@@ -570,8 +599,67 @@ export default function DesignPage() {
           </div>
 
           {/* Output Section */}
-          <div className="bg-white rounded-lg shadow-md p-8">
-            <h2 className="text-2xl font-bold mb-6">Design Preview</h2>
+          <div className="bg-white rounded-lg shadow-md p-4 md:p-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <h2 className="text-2xl font-bold">Design Preview</h2>
+              
+              {/* Optimization Buttons - Now on Preview Side */}
+              {imageUrl && (
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={optimizeForDTF}
+                    disabled={loading}
+                    className="flex-1 sm:flex-none bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
+                  >
+                    {loading && processingType === "optimize" ? (
+                      <>
+                        <span className="animate-spin">⏳</span>
+                        <span className="hidden sm:inline">Optimizing...</span>
+                        <span className="sm:hidden">...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>⚡</span>
+                        <span className="hidden sm:inline">Optimize</span>
+                        <span className="sm:hidden">Opt.</span>
+                      </>
+                    )}
+                  </button>
+
+                  {!hasTransparency && (
+                    <button
+                      onClick={removeBackground}
+                      disabled={loading}
+                      className="flex-1 sm:flex-none bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
+                    >
+                      {loading && processingType === "remove-bg" ? (
+                        <>
+                          <span className="animate-spin">⏳</span>
+                          <span className="hidden sm:inline">Removing...</span>
+                          <span className="sm:hidden">...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🔲</span>
+                          <span className="hidden sm:inline">Remove BG</span>
+                          <span className="sm:hidden">Rem. BG</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                  
+                  {hasTransparency && (
+                    <div className="flex-1 sm:flex-none px-4 py-2 bg-green-50 rounded-lg border border-green-200">
+                      <p className="text-xs text-green-800 flex items-center gap-1">
+                        <span>✓</span>
+                        <span className="hidden sm:inline">BG Removed</span>
+                        <span className="sm:hidden">✓ Ready</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {loading && processingType === "generate" ? (
               /* Loading Animation */
@@ -682,8 +770,10 @@ export default function DesignPage() {
                 {showMockup ? (
                     <div className="relative bg-gradient-to-br from-gray-100 to-gray-200 p-4 rounded-lg">
                       <div className="relative mx-auto" style={{ maxWidth: "500px" }}>
-                        {/* Realistic Apparel Mockup */}
-                        <div className="relative bg-white rounded-xl shadow-2xl overflow-hidden">
+                        {/* Realistic Apparel Mockup with Zoom */}
+                        <div 
+                          className="relative bg-white rounded-xl shadow-2xl overflow-hidden"
+                        >
                           {/* Mockup Type Label */}
                           <div className="absolute top-4 left-4 bg-black bg-opacity-75 text-white px-3 py-1 rounded-full text-sm font-semibold z-10">
                             {mockupType === "tshirt" ? "👕 T-Shirt" : 
@@ -722,8 +812,19 @@ export default function DesignPage() {
                             </button>
                           </div>
 
-                          {/* Apparel with Design Overlay */}
-                          <div className="relative">
+                          {/* Apparel with Design Overlay - Clickable Area */}
+                          <div 
+                            className="relative cursor-zoom-in"
+                            onMouseMove={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const x = e.clientX - rect.left;
+                              const y = e.clientY - rect.top;
+                              setMockupLensPosition({ x, y });
+                            }}
+                            onMouseEnter={() => setShowMockupLens(true)}
+                            onMouseLeave={() => setShowMockupLens(false)}
+                            onClick={() => setShowMockupEnlargedModal(true)}
+                          >
                             {/* Background Pattern for Depth */}
                             <div className="absolute inset-0 bg-gradient-to-b from-gray-50 to-gray-100"></div>
                             
@@ -739,18 +840,31 @@ export default function DesignPage() {
                                 </div>
                               )}
                               {mockupType === "tshirt" && mockupView === "back" && (
-                                <svg viewBox="0 0 400 500" className="w-full h-auto">
-                                  {/* T-Shirt Body - Back View */}
-                                  <path
-                                    d="M 80 80 L 120 50 L 150 50 L 150 20 Q 200 10 250 20 L 250 50 L 280 50 L 320 80 L 320 450 Q 320 480 300 480 L 100 480 Q 80 480 80 450 Z"
-                                    fill="#ffffff"
-                                    stroke="#e5e7eb"
-                                    strokeWidth="2"
+                                <div className="relative">
+                                  <img
+                                    src="/mockups/adult/tshirt-back.png"
+                                    alt="T-Shirt Back"
+                                    className="w-full h-auto"
+                                    onError={(e) => {
+                                      // Fallback to SVG if image doesn't exist
+                                      e.currentTarget.style.display = 'none';
+                                      const svg = e.currentTarget.nextElementSibling as HTMLElement;
+                                      if (svg) svg.style.display = 'block';
+                                    }}
                                   />
-                                  {/* Sleeves */}
-                                  <path d="M 80 80 L 50 120 L 70 180 L 120 140 Z" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1" />
-                                  <path d="M 320 80 L 350 120 L 330 180 L 280 140 Z" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1" />
-                                </svg>
+                                  <svg viewBox="0 0 400 500" className="w-full h-auto" style={{ display: 'none' }}>
+                                    {/* T-Shirt Body - Back View */}
+                                    <path
+                                      d="M 80 80 L 120 50 L 150 50 L 150 20 Q 200 10 250 20 L 250 50 L 280 50 L 320 80 L 320 450 Q 320 480 300 480 L 100 480 Q 80 480 80 450 Z"
+                                      fill="#ffffff"
+                                      stroke="#e5e7eb"
+                                      strokeWidth="2"
+                                    />
+                                    {/* Sleeves */}
+                                    <path d="M 80 80 L 50 120 L 70 180 L 120 140 Z" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1" />
+                                    <path d="M 320 80 L 350 120 L 330 180 L 280 140 Z" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1" />
+                                  </svg>
+                                </div>
                               )}
                               {mockupType === "hoodie" && (
                                 <svg viewBox="0 0 400 520" className="w-full h-auto">
@@ -858,14 +972,14 @@ export default function DesignPage() {
                                 <div 
                                   className="absolute"
                                   style={{
-                                    top: mockupPlacement === "front" ? "45%" :
-                                         mockupPlacement === "breast-left" || mockupPlacement === "breast-right" ? "25%" : "45%",
+                                    top: mockupPlacement === "front" ? "30%" :
+                                         mockupPlacement === "breast-left" || mockupPlacement === "breast-right" ? "25%" : "30%",
                                     left: mockupPlacement === "breast-left" ? "30%" :
                                           mockupPlacement === "breast-right" ? "70%" : "50%",
                                     transform: "translate(-50%, -50%)",
-                                    width: mockupPlacement === "front" ? (mockupType === "hat" ? "35%" : "45%") :
-                                           mockupPlacement === "breast-left" || mockupPlacement === "breast-right" ? "20%" : "45%",
-                                    maxWidth: mockupPlacement === "front" ? "200px" : "80px",
+                                    width: mockupPlacement === "front" ? (mockupType === "hat" ? "35%" : "40%") :
+                                           mockupPlacement === "breast-left" || mockupPlacement === "breast-right" ? "20%" : "40%",
+                                    maxWidth: mockupPlacement === "front" ? "180px" : "80px",
                                     zIndex: 5
                                   }}
                                 >
@@ -885,7 +999,7 @@ export default function DesignPage() {
                                 <div 
                                   className="absolute"
                                   style={{
-                                    top: "45%",
+                                    top: "32%",
                                     left: "50%",
                                     transform: "translate(-50%, -50%)",
                                     width: mockupType === "hat" ? "35%" : "45%",
@@ -996,21 +1110,349 @@ export default function DesignPage() {
                               Actual print quality may vary slightly.
                             </p>
                           </div>
+
+                          {/* Magnifying Lens for Mockup - Desktop only */}
+                          {showMockupLens && mockupType === "tshirt" && (
+                            <div
+                              className="absolute pointer-events-none border-4 border-blue-500 rounded-full shadow-2xl hidden md:block"
+                              style={{
+                                width: '150px',
+                                height: '150px',
+                                left: `${mockupLensPosition.x}px`,
+                                top: `${mockupLensPosition.y}px`,
+                                transform: 'translate(-50%, -50%)',
+                                zIndex: 20,
+                                overflow: 'hidden'
+                              }}
+                            >
+                              {/* Magnified mockup content */}
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  width: '300%',
+                                  height: '300%',
+                                  left: `${-mockupLensPosition.x * 3 + 75}px`,
+                                  top: `${-mockupLensPosition.y * 3 + 75}px`,
+                                  transform: 'scale(1.5)',
+                                  transformOrigin: '0 0'
+                                }}
+                              >
+                                {mockupView === "front" && (
+                                  <div className="relative">
+                                    <img
+                                      src="/mockups/adult/tshirt-front.png"
+                                      alt="T-Shirt Front Zoomed"
+                                      className="w-full h-auto"
+                                      style={{ width: '500px' }}
+                                    />
+                                    {mockupPlacement !== "back" && (
+                                      <div 
+                                        className="absolute"
+                                        style={{
+                                          top: mockupPlacement === "front" ? "30%" :
+                                               mockupPlacement === "breast-left" || mockupPlacement === "breast-right" ? "25%" : "30%",
+                                          left: mockupPlacement === "breast-left" ? "30%" :
+                                                mockupPlacement === "breast-right" ? "70%" : "50%",
+                                          transform: "translate(-50%, -50%)",
+                                          width: mockupPlacement === "front" ? "40%" : "20%",
+                                          maxWidth: mockupPlacement === "front" ? "180px" : "80px",
+                                        }}
+                                      >
+                                        <img
+                                          src={imageUrl}
+                                          alt="Design"
+                                          className="w-full h-auto object-contain"
+                                          style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.15))" }}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                {mockupView === "back" && (
+                                  <div className="relative">
+                                    <img
+                                      src="/mockups/adult/tshirt-back.png"
+                                      alt="T-Shirt Back Zoomed"
+                                      className="w-full h-auto"
+                                      style={{ width: '500px' }}
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        const svg = e.currentTarget.nextElementSibling as HTMLElement;
+                                        if (svg) svg.style.display = 'block';
+                                      }}
+                                    />
+                                    <svg viewBox="0 0 400 500" className="w-full h-auto" style={{ display: 'none', width: '500px' }}>
+                                      <path
+                                        d="M 80 80 L 120 50 L 150 50 L 150 20 Q 200 10 250 20 L 250 50 L 280 50 L 320 80 L 320 450 Q 320 480 300 480 L 100 480 Q 80 480 80 450 Z"
+                                        fill="#ffffff"
+                                        stroke="#e5e7eb"
+                                        strokeWidth="2"
+                                      />
+                                      <path d="M 80 80 L 50 120 L 70 180 L 120 140 Z" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1" />
+                                      <path d="M 320 80 L 350 120 L 330 180 L 280 140 Z" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1" />
+                                    </svg>
+                                    {mockupPlacement === "back" && (
+                                      <div 
+                                        className="absolute"
+                                        style={{
+                                          top: "32%",
+                                          left: "50%",
+                                          transform: "translate(-50%, -50%)",
+                                          width: "45%",
+                                          maxWidth: "200px",
+                                        }}
+                                      >
+                                        <img
+                                          src={imageUrl}
+                                          alt="Design"
+                                          className="w-full h-auto object-contain"
+                                          style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.15))" }}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="absolute inset-0 border-2 border-white rounded-full pointer-events-none"></div>
+                            </div>
+                          )}
+                          
+                          {/* Tap to Enlarge Badge - Mobile only */}
+                          <div className="md:hidden absolute bottom-2 right-2 bg-black bg-opacity-75 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 z-10">
+                            <span>🔍</span>
+                            <span>Tap to Enlarge</span>
+                          </div>
+                        </div>
+
+                        {/* Print Quality Notice for Mockup */}
+                        <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+                          <p className="text-xs text-gray-700 text-center flex items-center justify-center gap-2">
+                            <span className="text-lg">✨</span>
+                            <span>
+                              <strong>Professional Print Quality:</strong> Actual prints are significantly sharper and more vibrant than screen preview. Our DTF transfers deliver 100% true-to-design quality with exceptional detail and color accuracy.
+                            </span>
+                          </p>
                         </div>
                       </div>
+
+                      {/* Enlarged Mockup Modal for Mobile */}
+                      {showMockupEnlargedModal && (
+                        <div 
+                          className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
+                          onClick={() => setShowMockupEnlargedModal(false)}
+                        >
+                          <div className="relative max-w-full max-h-full">
+                            <button
+                              onClick={() => setShowMockupEnlargedModal(false)}
+                              className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-red-700 transition font-bold shadow-lg z-10"
+                            >
+                              ×
+                            </button>
+                            <div className="bg-white rounded-lg p-4 max-w-[90vw] max-h-[90vh] overflow-auto">
+                              <div className="relative">
+                                {mockupView === "front" && (
+                                  <img
+                                    src="/mockups/adult/tshirt-front.png"
+                                    alt="Enlarged mockup front"
+                                    className="w-full h-auto"
+                                  />
+                                )}
+                                {mockupView === "back" && (
+                                  <img
+                                    src="/mockups/adult/tshirt-back.png"
+                                    alt="Enlarged mockup back"
+                                    className="w-full h-auto"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      const svg = e.currentTarget.nextElementSibling as HTMLElement;
+                                      if (svg) svg.style.display = 'block';
+                                    }}
+                                  />
+                                )}
+                                {mockupView === "back" && (
+                                  <svg viewBox="0 0 400 500" className="w-full h-auto" style={{ display: 'none' }}>
+                                    <path
+                                      d="M 80 80 L 120 50 L 150 50 L 150 20 Q 200 10 250 20 L 250 50 L 280 50 L 320 80 L 320 450 Q 320 480 300 480 L 100 480 Q 80 480 80 450 Z"
+                                      fill="#ffffff"
+                                      stroke="#e5e7eb"
+                                      strokeWidth="2"
+                                    />
+                                    <path d="M 80 80 L 50 120 L 70 180 L 120 140 Z" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1" />
+                                    <path d="M 320 80 L 350 120 L 330 180 L 280 140 Z" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1" />
+                                  </svg>
+                                )}
+                                {mockupView === "front" && mockupPlacement !== "back" && (
+                                  <div 
+                                    className="absolute"
+                                    style={{
+                                      top: mockupPlacement === "front" ? "30%" :
+                                           mockupPlacement === "breast-left" || mockupPlacement === "breast-right" ? "25%" : "30%",
+                                      left: mockupPlacement === "breast-left" ? "30%" :
+                                            mockupPlacement === "breast-right" ? "70%" : "50%",
+                                      transform: "translate(-50%, -50%)",
+                                      width: mockupPlacement === "front" ? (mockupType === "hat" ? "35%" : "40%") :
+                                             mockupPlacement === "breast-left" || mockupPlacement === "breast-right" ? "20%" : "40%",
+                                      maxWidth: mockupPlacement === "front" ? "180px" : "80px",
+                                      zIndex: 5
+                                    }}
+                                  >
+                                    <img
+                                      src={imageUrl}
+                                      alt="Design preview"
+                                      className="w-full h-auto object-contain"
+                                      style={{
+                                        filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.15))"
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                                {mockupView === "back" && mockupPlacement === "back" && (
+                                  <div 
+                                    className="absolute"
+                                    style={{
+                                      top: "32%",
+                                      left: "50%",
+                                      transform: "translate(-50%, -50%)",
+                                      width: "45%",
+                                      maxWidth: "200px",
+                                      zIndex: 5
+                                    }}
+                                  >
+                                    <img
+                                      src={imageUrl}
+                                      alt="Design preview on back"
+                                      className="w-full h-auto object-contain"
+                                      style={{
+                                        filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.15))"
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-center mt-4 text-white text-sm">
+                              Pinch to zoom • Swipe to pan
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <div className="relative select-none" onContextMenu={(e) => e.preventDefault()}>
-                      <img
-                        src={imageUrl}
-                        alt="Design preview"
-                        className="w-full h-auto pointer-events-none"
-                        draggable="false"
-                        onDragStart={(e) => e.preventDefault()}
-                      />
-                      <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                        <div className="text-white text-opacity-10 text-6xl font-bold transform rotate-[-30deg]">
-                          LIFEWEAR PRINTS
+                    <div className="relative">
+                      {/* Desktop: Magnifying Lens on Hover + Click to Enlarge */}
+                      <div 
+                        className="relative select-none hidden md:block cursor-zoom-in"
+                        onContextMenu={(e) => e.preventDefault()}
+                        onClick={() => setShowEnlargedModal(true)}
+                        onMouseMove={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const x = e.clientX - rect.left;
+                          const y = e.clientY - rect.top;
+                          setLensPosition({ x, y });
+                        }}
+                        onMouseEnter={() => setShowLens(true)}
+                        onMouseLeave={() => setShowLens(false)}
+                      >
+                        <img
+                          src={imageUrl}
+                          alt="Design preview"
+                          className="w-full h-auto"
+                          draggable="false"
+                          onDragStart={(e) => e.preventDefault()}
+                        />
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                          <div className="text-white text-opacity-10 text-6xl font-bold transform rotate-[-30deg]">
+                            LIFEWEAR PRINTS
+                          </div>
+                        </div>
+                        
+                        {/* Magnifying Lens */}
+                        {showLens && (
+                          <div
+                            className="absolute pointer-events-none border-4 border-blue-500 rounded-full overflow-hidden shadow-2xl"
+                            style={{
+                              width: '200px',
+                              height: '200px',
+                              left: `${lensPosition.x}px`,
+                              top: `${lensPosition.y}px`,
+                              transform: 'translate(-50%, -50%)',
+                              backgroundImage: `url(${imageUrl})`,
+                              backgroundPosition: `${-lensPosition.x * 2 + 100}px ${-lensPosition.y * 2 + 100}px`,
+                              backgroundSize: '200%',
+                              backgroundRepeat: 'no-repeat',
+                              zIndex: 10
+                            }}
+                          >
+                            <div className="absolute inset-0 border-2 border-white rounded-full"></div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Mobile: Click to Enlarge */}
+                      <div 
+                        className="relative select-none md:hidden cursor-pointer"
+                        onContextMenu={(e) => e.preventDefault()}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setShowEnlargedModal(true);
+                        }}
+                        style={{ touchAction: 'manipulation' }}
+                      >
+                        <img
+                          src={imageUrl}
+                          alt="Design preview"
+                          className="w-full h-auto"
+                          draggable="false"
+                          onDragStart={(e) => e.preventDefault()}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setShowEnlargedModal(true);
+                          }}
+                        />
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                          <div className="text-white text-opacity-10 text-6xl font-bold transform rotate-[-30deg]">
+                            LIFEWEAR PRINTS
+                          </div>
+                        </div>
+                        {/* Click to Enlarge Badge */}
+                        <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 pointer-events-none">
+                          <span>🔍</span>
+                          <span>Tap to Enlarge</span>
+                        </div>
+                      </div>
+
+                      {/* Print Quality Notice */}
+                      <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+                        <p className="text-xs text-gray-700 text-center flex items-center justify-center gap-2">
+                          <span className="text-lg">✨</span>
+                          <span>
+                            <strong>Professional Print Quality:</strong> Actual prints are significantly sharper and more vibrant than screen preview. Our DTF transfers deliver 100% true-to-design quality with exceptional detail and color accuracy.
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Enlarged Modal for Mobile */}
+                  {showEnlargedModal && (
+                    <div 
+                      className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
+                      onClick={() => setShowEnlargedModal(false)}
+                    >
+                      <div className="relative max-w-full max-h-full">
+                        <button
+                          onClick={() => setShowEnlargedModal(false)}
+                          className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-red-700 transition font-bold shadow-lg z-10"
+                        >
+                          ×
+                        </button>
+                        <img
+                          src={imageUrl}
+                          alt="Enlarged design"
+                          className="max-w-full max-h-[90vh] object-contain rounded-lg"
+                        />
+                        <div className="text-center mt-4 text-white text-sm">
+                          Pinch to zoom • Swipe to pan
                         </div>
                       </div>
                     </div>
@@ -1022,13 +1464,13 @@ export default function DesignPage() {
                   <div className="flex gap-2 mb-2">
                     <button
                       onClick={() => setShowMockup(!showMockup)}
-                      className={`flex-1 py-2 px-4 rounded-lg font-semibold transition ${
+                      className={`flex-1 py-3 px-4 rounded-lg font-semibold transition text-sm ${
                         showMockup
                           ? "bg-blue-600 text-white"
                           : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                       }`}
                     >
-                      {showMockup ? "👕 Mockup View" : "🖼️ Design View"}
+                      {showMockup ? "🖼️ Back to Design View" : "👕 Preview on Apparel"}
                     </button>
                   </div>
                   {showMockup && (
@@ -1183,34 +1625,6 @@ export default function DesignPage() {
                   </div>
                 )}
 
-                {!uploadedImage && (
-                  <div className="space-y-3 mb-4">
-                    <button
-                      onClick={optimizeForDTF}
-                      disabled={loading}
-                      className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition disabled:bg-gray-400"
-                    >
-                      ⚡ Optimize
-                    </button>
-                    {!hasTransparency && (
-                      <button
-                        onClick={removeBackground}
-                        disabled={loading}
-                        className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition disabled:bg-gray-400"
-                      >
-                        🔲 Remove BG
-                      </button>
-                    )}
-                    {hasTransparency && (
-                      <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                        <p className="text-sm text-green-800 flex items-center gap-2">
-                          <span className="text-lg">✓</span>
-                          <span><strong>Background removed!</strong> Your design is ready for printing.</span>
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Selected Designs for Printing */}
                 {selectedDesigns.length > 0 && (

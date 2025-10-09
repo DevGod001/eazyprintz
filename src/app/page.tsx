@@ -120,17 +120,23 @@ export default function Home() {
             <form className="space-y-4">
               <input 
                 type="text" 
-                placeholder="Your Name" 
+                placeholder="Your Name"
+                autoComplete="name"
+                suppressHydrationWarning
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <input 
                 type="email" 
-                placeholder="Your Email" 
+                placeholder="Your Email"
+                autoComplete="email"
+                suppressHydrationWarning
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <textarea 
                 placeholder="Your Message" 
                 rows={4}
+                autoComplete="off"
+                suppressHydrationWarning
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               ></textarea>
               <button 

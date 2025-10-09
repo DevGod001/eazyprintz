@@ -20,6 +20,14 @@ export default function DesignPage() {
   const [mockupPlacement, setMockupPlacement] = useState<"front" | "back" | "breast-left" | "breast-right">("front");
   const [mockupView, setMockupView] = useState<"front" | "back">("front");
   
+  // Multi-position placement with checkboxes
+  const [selectedPlacements, setSelectedPlacements] = useState<("front" | "back" | "breast-left" | "breast-right")[]>(["front"]);
+  const [autoRotate, setAutoRotate] = useState(false);
+  const [currentRotationIndex, setCurrentRotationIndex] = useState(0);
+  
+  // Background detection
+  const [hasTransparency, setHasTransparency] = useState(false);
+  
   // Size selection state
   const [showSizeSelection, setShowSizeSelection] = useState(false);
   const [sizeType, setSizeType] = useState<"popular" | "custom">("popular");
@@ -148,14 +156,69 @@ export default function DesignPage() {
     return "adult";
   };
 
+  // Check if image has transparency
+  const checkImageTransparency = (imageUrl: string) => {
+    const img = new Image();
+    // Don't set crossOrigin for blob URLs
+    if (!imageUrl.startsWith('blob:')) {
+      img.crossOrigin = "anonymous";
+    }
+    
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          console.log("Could not get canvas context");
+          setHasTransparency(false);
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        
+        // Check if any pixel has alpha < 255 (transparent)
+        let hasTransparentPixel = false;
+        for (let i = 3; i < data.length; i += 4) {
+          if (data[i] < 255) {
+            hasTransparentPixel = true;
+            break;
+          }
+        }
+        
+        console.log(`Transparency check: ${hasTransparentPixel ? 'HAS' : 'NO'} transparency`);
+        setHasTransparency(hasTransparentPixel);
+      } catch (error) {
+        // If we can't read the image data, assume no transparency
+        console.error("Cannot check transparency:", error);
+        setHasTransparency(false);
+      }
+    };
+    
+    img.onerror = (error) => {
+      console.error("Error loading image for transparency check:", error);
+      setHasTransparency(false);
+    };
+    
+    img.src = imageUrl;
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        setUploadedImage(event.target?.result as string);
-        setImageUrl(event.target?.result as string);
+        const url = event.target?.result as string;
+        setUploadedImage(url);
+        setImageUrl(url);
         setPrompt("");
+        // Check if uploaded image has transparency
+        checkImageTransparency(url);
       };
       reader.readAsDataURL(file);
     }
@@ -211,6 +274,9 @@ export default function DesignPage() {
         setGeneratedImages(imageUrls);
         setSelectedImageIndex(0);
         setImageUrl(imageUrls[0]);
+        
+        // Check if generated image has transparency
+        checkImageTransparency(imageUrls[0]);
         
         // Detect audience type from prompt
         const audience = detectAudience(prompt);
@@ -461,22 +527,33 @@ export default function DesignPage() {
                     )}
                   </button>
 
-                  <button
-                    onClick={removeBackground}
-                    disabled={loading || !imageUrl}
-                    className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {loading && processingType === "remove-bg" ? (
-                      <>
-                        <span className="animate-spin">⏳</span>
-                        Removing Background...
-                      </>
-                    ) : (
-                      <>
-                        🔲 Remove Background
-                      </>
-                    )}
-                  </button>
+                  {!hasTransparency && (
+                    <button
+                      onClick={removeBackground}
+                      disabled={loading || !imageUrl}
+                      className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {loading && processingType === "remove-bg" ? (
+                        <>
+                          <span className="animate-spin">⏳</span>
+                          Removing Background...
+                        </>
+                      ) : (
+                        <>
+                          🔲 Remove Background
+                        </>
+                      )}
+                    </button>
+                  )}
+                  
+                  {hasTransparency && (
+                    <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                      <p className="text-sm text-green-800 flex items-center gap-2">
+                        <span className="text-lg">✓</span>
+                        <span><strong>Background removed!</strong> Your design is ready for printing.</span>
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
@@ -724,20 +801,56 @@ export default function DesignPage() {
                                   <circle cx="200" cy="460" r="5" fill="#d1d5db" />
                                 </svg>
                               )}
-                              {mockupType === "hat" && (
-                                <svg viewBox="0 0 400 300" className="w-full h-auto">
-                                  {/* Cap */}
-                                  <ellipse cx="200" cy="180" rx="150" ry="20" fill="#4b5563" opacity="0.3" />
-                                  <path
-                                    d="M 100 180 Q 100 120 200 100 Q 300 120 300 180 L 280 185 Q 280 140 200 125 Q 120 140 120 185 Z"
-                                    fill="#1f2937"
-                                    stroke="#111827"
-                                    strokeWidth="2"
+                              {mockupType === "hat" && mockupView === "front" && (
+                                <div className="relative">
+                                  <img
+                                    src="/mockups/adult/hat-front.png"
+                                    alt="Hat Front"
+                                    className="w-full h-auto"
+                                    onError={(e) => {
+                                      // Fallback to SVG if image doesn't exist
+                                      e.currentTarget.style.display = 'none';
+                                      const svg = e.currentTarget.nextElementSibling as HTMLElement;
+                                      if (svg) svg.style.display = 'block';
+                                    }}
                                   />
-                                  {/* Bill */}
-                                  <ellipse cx="200" cy="185" rx="180" ry="30" fill="#374151" stroke="#1f2937" strokeWidth="2" />
-                                  <path d="M 100 180 Q 200 190 300 180" stroke="#111827" strokeWidth="1" fill="none" />
-                                </svg>
+                                  <svg viewBox="0 0 400 300" className="w-full h-auto" style={{ display: 'none' }}>
+                                    <ellipse cx="200" cy="180" rx="150" ry="20" fill="#4b5563" opacity="0.3" />
+                                    <path
+                                      d="M 100 180 Q 100 120 200 100 Q 300 120 300 180 L 280 185 Q 280 140 200 125 Q 120 140 120 185 Z"
+                                      fill="#1f2937"
+                                      stroke="#111827"
+                                      strokeWidth="2"
+                                    />
+                                    <ellipse cx="200" cy="185" rx="180" ry="30" fill="#374151" stroke="#1f2937" strokeWidth="2" />
+                                    <path d="M 100 180 Q 200 190 300 180" stroke="#111827" strokeWidth="1" fill="none" />
+                                  </svg>
+                                </div>
+                              )}
+                              {mockupType === "hat" && mockupView === "back" && (
+                                <div className="relative">
+                                  <img
+                                    src="/mockups/adult/hat-back.png"
+                                    alt="Hat Back"
+                                    className="w-full h-auto"
+                                    onError={(e) => {
+                                      // Fallback to SVG if image doesn't exist
+                                      e.currentTarget.style.display = 'none';
+                                      const svg = e.currentTarget.nextElementSibling as HTMLElement;
+                                      if (svg) svg.style.display = 'block';
+                                    }}
+                                  />
+                                  <svg viewBox="0 0 400 300" className="w-full h-auto" style={{ display: 'none' }}>
+                                    <ellipse cx="200" cy="180" rx="150" ry="20" fill="#4b5563" opacity="0.3" />
+                                    <path
+                                      d="M 100 180 Q 100 120 200 100 Q 300 120 300 180 L 280 185 Q 280 140 200 125 Q 120 140 120 185 Z"
+                                      fill="#1f2937"
+                                      stroke="#111827"
+                                      strokeWidth="2"
+                                    />
+                                    <ellipse cx="200" cy="185" rx="180" ry="30" fill="#374151" stroke="#1f2937" strokeWidth="2" />
+                                  </svg>
+                                </div>
                               )}
 
                               {/* Design Overlay - Positioned based on placement selection */}
@@ -793,63 +906,81 @@ export default function DesignPage() {
                             </div>
                           </div>
 
-                          {/* Placement Controls */}
+                          {/* Placement Controls with Multi-Position Checkboxes */}
                           <div className="bg-gray-800 px-4 py-3 border-t border-gray-700">
-                            <p className="text-xs text-white mb-2 font-semibold">Design Placement:</p>
-                            <div className="flex gap-2 flex-wrap">
-                              <button
-                                onClick={() => {
-                                  setMockupPlacement("front");
-                                  setMockupView("front");
-                                }}
-                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
-                                  mockupPlacement === "front"
-                                    ? "bg-blue-600 text-white"
-                                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                                }`}
-                              >
-                                Front Center
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setMockupPlacement("back");
-                                  setMockupView("back");
-                                }}
-                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
-                                  mockupPlacement === "back"
-                                    ? "bg-blue-600 text-white"
-                                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                                }`}
-                              >
-                                Back Center
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setMockupPlacement("breast-left");
-                                  setMockupView("front");
-                                }}
-                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
-                                  mockupPlacement === "breast-left"
-                                    ? "bg-blue-600 text-white"
-                                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                                }`}
-                              >
-                                Left Breast
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setMockupPlacement("breast-right");
-                                  setMockupView("front");
-                                }}
-                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
-                                  mockupPlacement === "breast-right"
-                                    ? "bg-blue-600 text-white"
-                                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                                }`}
-                              >
-                                Right Breast
-                              </button>
+                            <p className="text-xs text-white mb-2 font-semibold">Design Placement - Check multiple positions:</p>
+                            <div className="grid grid-cols-2 gap-2 mb-3">
+                              {(mockupType === "hat" 
+                                ? (["front", "back"] as const)
+                                : (["front", "back", "breast-left", "breast-right"] as const)
+                              ).map((placement) => (
+                                <label
+                                  key={placement}
+                                  className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition ${
+                                    selectedPlacements.includes(placement)
+                                      ? "bg-blue-600 text-white"
+                                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedPlacements.includes(placement)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedPlacements([...selectedPlacements, placement]);
+                                        setMockupPlacement(placement);
+                                        if (placement === "back") setMockupView("back");
+                                        else setMockupView("front");
+                                      } else {
+                                        const newPlacements = selectedPlacements.filter(p => p !== placement);
+                                        setSelectedPlacements(newPlacements.length > 0 ? newPlacements : ["front"]);
+                                        if (newPlacements.length > 0) {
+                                          setMockupPlacement(newPlacements[0]);
+                                          if (newPlacements[0] === "back") setMockupView("back");
+                                          else setMockupView("front");
+                                        }
+                                      }
+                                    }}
+                                    className="w-4 h-4"
+                                  />
+                                  <span className="text-xs font-semibold">
+                                    {placement === "front" ? "Front Center" : 
+                                     placement === "back" ? "Back Center" :
+                                     placement === "breast-left" ? "Left Breast" : "Right Breast"}
+                                  </span>
+                                </label>
+                              ))}
                             </div>
+                            {selectedPlacements.length > 1 && (
+                              <button
+                                onClick={() => {
+                                  setAutoRotate(!autoRotate);
+                                  if (!autoRotate) {
+                                    setCurrentRotationIndex(0);
+                                    const interval = setInterval(() => {
+                                      setCurrentRotationIndex(prev => {
+                                        const next = (prev + 1) % selectedPlacements.length;
+                                        const nextPlacement = selectedPlacements[next];
+                                        setMockupPlacement(nextPlacement);
+                                        if (nextPlacement === "back") setMockupView("back");
+                                        else setMockupView("front");
+                                        return next;
+                                      });
+                                    }, 2000);
+                                    (window as any).rotationInterval = interval;
+                                  } else {
+                                    clearInterval((window as any).rotationInterval);
+                                  }
+                                }}
+                                className={`w-full py-2 rounded-lg font-semibold text-xs transition ${
+                                  autoRotate
+                                    ? "bg-green-600 text-white"
+                                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                                }`}
+                              >
+                                {autoRotate ? "🔄 Auto-Rotating..." : "🔄 Preview All Positions"}
+                              </button>
+                            )}
                           </div>
 
                           {/* Info Bar */}
@@ -1053,21 +1184,31 @@ export default function DesignPage() {
                 )}
 
                 {!uploadedImage && (
-                  <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="space-y-3 mb-4">
                     <button
                       onClick={optimizeForDTF}
                       disabled={loading}
-                      className="bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition disabled:bg-gray-400"
+                      className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition disabled:bg-gray-400"
                     >
                       ⚡ Optimize
                     </button>
-                    <button
-                      onClick={removeBackground}
-                      disabled={loading}
-                      className="bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition disabled:bg-gray-400"
-                    >
-                      🔲 Remove BG
-                    </button>
+                    {!hasTransparency && (
+                      <button
+                        onClick={removeBackground}
+                        disabled={loading}
+                        className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition disabled:bg-gray-400"
+                      >
+                        🔲 Remove BG
+                      </button>
+                    )}
+                    {hasTransparency && (
+                      <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                        <p className="text-sm text-green-800 flex items-center gap-2">
+                          <span className="text-lg">✓</span>
+                          <span><strong>Background removed!</strong> Your design is ready for printing.</span>
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 

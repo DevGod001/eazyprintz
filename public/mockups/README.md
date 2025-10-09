@@ -28,10 +28,20 @@ For each category, add PNG images with transparent backgrounds showing the produ
 
 **Adult Category** (`adult/`):
 
-- `adult-tshirt.png` - Adult t-shirt
-- `adult-hoodie.png` - Adult hoodie
-- `adult-sweatshirt.png` - Adult sweatshirt
-- `adult-hat.png` - Adult hat/cap
+- `tshirt-front.png` - Adult t-shirt (front view)
+- `tshirt-back.png` - Adult t-shirt (back view)
+- `hoodie-front.png` - Adult hoodie (front view)
+- `hoodie-back.png` - Adult hoodie (back view)
+- `sweatshirt-front.png` - Adult sweatshirt (front view)
+- `sweatshirt-back.png` - Adult sweatshirt (back view)
+- `hat-front.png` - Adult hat/cap (front view)
+- `hat-back.png` - Adult hat/cap (back view)
+
+**Note for Hats**: Hat mockups are CRITICAL because hats have a unique shape. You must add:
+
+- `hat-front.png` - Shows the front panel of the cap where designs are typically placed
+- `hat-back.png` - Shows the back panel of the cap for back designs
+  These images should clearly show the placement area for designs to align correctly.
 
 ## Image Specifications
 

@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -24,11 +25,9 @@ export default function Home() {
           <p className="text-xl mb-8 max-w-2xl mx-auto">
             Premium quality print-on-demand clothing. Design your style, we handle the rest.
           </p>
-          <a href="/design">
-            <button className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition">
-              Start Designing
-            </button>
-          </a>
+          <Link href="/design" className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition inline-block">
+            Start Designing
+          </Link>
         </div>
       </section>
 

@@ -35,15 +35,14 @@ export async function POST(request: NextRequest) {
     
     console.log("Image metadata:", metadata);
     
-    // Convert white background to transparent
+    // Convert background to transparent
     const transparentBuffer = await image
       .ensureAlpha() // Ensure image has alpha channel
       .raw()
       .toBuffer({ resolveWithObject: true })
       .then(({ data, info }) => {
-        // Process pixels: make white (or near-white) pixels transparent
+        // Process pixels: detect and remove background color
         const pixels = new Uint8Array(data);
-        const threshold = 240; // Adjust this value (240-255) for white detection sensitivity
         
         let transparentPixels = 0;
         for (let i = 0; i < pixels.length; i += info.channels) {
@@ -51,14 +50,40 @@ export async function POST(request: NextRequest) {
           const g = pixels[i + 1];
           const b = pixels[i + 2];
           
-          // If pixel is white or near-white, make it transparent
-          if (r > threshold && g > threshold && b > threshold) {
+          // Detect white or near-white backgrounds (for white backgrounds)
+          const isWhitish = r > 235 && g > 235 && b > 235;
+          
+          // Detect blue backgrounds (common in product photos)
+          // Blue channel dominant, with r and g being lower
+          const isBlueBackground = b > 100 && b > r + 20 && b > g + 20;
+          
+          // More aggressive white/light color detection
+          const isLightBackground = r > 200 && g > 200 && b > 200;
+          
+          // Calculate color distance for gradual transparency
+          // This helps remove edge artifacts
+          const avgIntensity = (r + g + b) / 3;
+          const colorVariance = Math.max(
+            Math.abs(r - avgIntensity),
+            Math.abs(g - avgIntensity),
+            Math.abs(b - avgIntensity)
+          );
+          
+          // If it's a background color (low variance, light or blue)
+          if ((isWhitish || isLightBackground || isBlueBackground) && colorVariance < 40) {
             pixels[i + 3] = 0; // Set alpha to 0 (transparent)
+            transparentPixels++;
+          }
+          // For edge pixels, use gradual transparency
+          else if (colorVariance < 60 && avgIntensity > 180) {
+            // Gradually fade based on how close to background color
+            const alphaValue = Math.min(255, colorVariance * 4);
+            pixels[i + 3] = alphaValue;
             transparentPixels++;
           }
         }
         
-        console.log(`Made ${transparentPixels} pixels transparent`);
+        console.log(`Made ${transparentPixels} pixels transparent or semi-transparent`);
         
         // Convert back to image
         return sharp(pixels, {

@@ -950,39 +950,108 @@ export default function DesignPage() {
                                   </svg>
                                 </div>
                               )}
-                              {mockupType === "hoodie" && (
-                                <svg viewBox="0 0 400 520" className="w-full h-auto">
-                                  {/* Hoodie Body */}
-                                  <path
-                                    d="M 80 100 L 120 60 L 150 60 L 150 40 Q 200 25 250 40 L 250 60 L 280 60 L 320 100 L 320 470 Q 320 500 300 500 L 100 500 Q 80 500 80 470 Z"
-                                    fill="#f3f4f6"
-                                    stroke="#d1d5db"
-                                    strokeWidth="2"
+                              {mockupType === "hoodie" && mockupView === "front" && (
+                                <div className="relative">
+                                  <img
+                                    src="/mockups/adult/hoodie-front.png"
+                                    alt="Hoodie Front"
+                                    className="w-full h-auto"
+                                    onError={(e) => {
+                                      // Fallback to SVG if image doesn't exist
+                                      e.currentTarget.style.display = 'none';
+                                      const svg = e.currentTarget.nextElementSibling as HTMLElement;
+                                      if (svg) svg.style.display = 'block';
+                                    }}
                                   />
-                                  {/* Hood */}
-                                  <path d="M 150 40 Q 200 10 250 40 L 240 80 Q 200 70 160 80 Z" fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1" />
-                                  {/* Pocket */}
-                                  <rect x="130" y="280" width="140" height="80" rx="5" fill="#ffffff" stroke="#d1d5db" strokeWidth="1" opacity="0.7" />
-                                  {/* Drawstrings */}
-                                  <line x1="180" y1="100" x2="180" y2="140" stroke="#9ca3af" strokeWidth="2" />
-                                  <line x1="220" y1="100" x2="220" y2="140" stroke="#9ca3af" strokeWidth="2" />
-                                </svg>
+                                  <svg viewBox="0 0 400 520" className="w-full h-auto" style={{ display: 'none' }}>
+                                    <path
+                                      d="M 80 100 L 120 60 L 150 60 L 150 40 Q 200 25 250 40 L 250 60 L 280 60 L 320 100 L 320 470 Q 320 500 300 500 L 100 500 Q 80 500 80 470 Z"
+                                      fill="#f3f4f6"
+                                      stroke="#d1d5db"
+                                      strokeWidth="2"
+                                    />
+                                    <path d="M 150 40 Q 200 10 250 40 L 240 80 Q 200 70 160 80 Z" fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1" />
+                                    <rect x="130" y="280" width="140" height="80" rx="5" fill="#ffffff" stroke="#d1d5db" strokeWidth="1" opacity="0.7" />
+                                    <line x1="180" y1="100" x2="180" y2="140" stroke="#9ca3af" strokeWidth="2" />
+                                    <line x1="220" y1="100" x2="220" y2="140" stroke="#9ca3af" strokeWidth="2" />
+                                  </svg>
+                                </div>
                               )}
-                              {mockupType === "sweatshirt" && (
-                                <svg viewBox="0 0 400 500" className="w-full h-auto">
-                                  {/* Sweatshirt Body */}
-                                  <path
-                                    d="M 80 90 L 120 55 L 150 55 L 150 30 Q 200 15 250 30 L 250 55 L 280 55 L 320 90 L 320 460 Q 320 490 300 490 L 100 490 Q 80 490 80 460 Z"
-                                    fill="#e5e7eb"
-                                    stroke="#d1d5db"
-                                    strokeWidth="2"
+                              {mockupType === "hoodie" && mockupView === "back" && (
+                                <div className="relative">
+                                  <img
+                                    src="/mockups/adult/hoodie-back.png"
+                                    alt="Hoodie Back"
+                                    className="w-full h-auto"
+                                    onError={(e) => {
+                                      // Fallback to SVG if image doesn't exist
+                                      e.currentTarget.style.display = 'none';
+                                      const svg = e.currentTarget.nextElementSibling as HTMLElement;
+                                      if (svg) svg.style.display = 'block';
+                                    }}
                                   />
-                                  {/* Ribbed Cuffs */}
-                                  <rect x="80" y="440" width="40" height="40" fill="#d1d5db" />
-                                  <rect x="280" y="440" width="40" height="40" fill="#d1d5db" />
-                                  {/* Crew Neck */}
-                                  <ellipse cx="200" cy="65" rx="45" ry="30" fill="#d1d5db" stroke="#9ca3af" strokeWidth="1" />
-                                </svg>
+                                  <svg viewBox="0 0 400 520" className="w-full h-auto" style={{ display: 'none' }}>
+                                    <path
+                                      d="M 80 100 L 120 60 L 150 60 L 150 40 Q 200 25 250 40 L 250 60 L 280 60 L 320 100 L 320 470 Q 320 500 300 500 L 100 500 Q 80 500 80 470 Z"
+                                      fill="#f3f4f6"
+                                      stroke="#d1d5db"
+                                      strokeWidth="2"
+                                    />
+                                    <path d="M 150 40 Q 200 10 250 40 L 240 80 Q 200 70 160 80 Z" fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1" />
+                                  </svg>
+                                </div>
+                              )}
+                              {mockupType === "sweatshirt" && mockupView === "front" && (
+                                <div className="relative">
+                                  <img
+                                    src="/mockups/adult/sweatshirt-front.png"
+                                    alt="Sweatshirt Front"
+                                    className="w-full h-auto"
+                                    onError={(e) => {
+                                      // Fallback to SVG if image doesn't exist
+                                      e.currentTarget.style.display = 'none';
+                                      const svg = e.currentTarget.nextElementSibling as HTMLElement;
+                                      if (svg) svg.style.display = 'block';
+                                    }}
+                                  />
+                                  <svg viewBox="0 0 400 500" className="w-full h-auto" style={{ display: 'none' }}>
+                                    <path
+                                      d="M 80 90 L 120 55 L 150 55 L 150 30 Q 200 15 250 30 L 250 55 L 280 55 L 320 90 L 320 460 Q 320 490 300 490 L 100 490 Q 80 490 80 460 Z"
+                                      fill="#e5e7eb"
+                                      stroke="#d1d5db"
+                                      strokeWidth="2"
+                                    />
+                                    <rect x="80" y="440" width="40" height="40" fill="#d1d5db" />
+                                    <rect x="280" y="440" width="40" height="40" fill="#d1d5db" />
+                                    <ellipse cx="200" cy="65" rx="45" ry="30" fill="#d1d5db" stroke="#9ca3af" strokeWidth="1" />
+                                  </svg>
+                                </div>
+                              )}
+                              {mockupType === "sweatshirt" && mockupView === "back" && (
+                                <div className="relative">
+                                  <img
+                                    src="/mockups/adult/sweatshirt-back.png"
+                                    alt="Sweatshirt Back"
+                                    className="w-full h-auto"
+                                    onError={(e) => {
+                                      // Fallback to SVG if image doesn't exist
+                                      e.currentTarget.style.display = 'none';
+                                      const svg = e.currentTarget.nextElementSibling as HTMLElement;
+                                      if (svg) svg.style.display = 'block';
+                                    }}
+                                  />
+                                  <svg viewBox="0 0 400 500" className="w-full h-auto" style={{ display: 'none' }}>
+                                    <path
+                                      d="M 80 90 L 120 55 L 150 55 L 150 30 Q 200 15 250 30 L 250 55 L 280 55 L 320 90 L 320 460 Q 320 490 300 490 L 100 490 Q 80 490 80 460 Z"
+                                      fill="#e5e7eb"
+                                      stroke="#d1d5db"
+                                      strokeWidth="2"
+                                    />
+                                    <rect x="80" y="440" width="40" height="40" fill="#d1d5db" />
+                                    <rect x="280" y="440" width="40" height="40" fill="#d1d5db" />
+                                    <ellipse cx="200" cy="65" rx="45" ry="30" fill="#d1d5db" stroke="#9ca3af" strokeWidth="1" />
+                                  </svg>
+                                </div>
                               )}
                               {mockupType === "onesie" && (
                                 <svg viewBox="0 0 400 550" className="w-full h-auto">
@@ -1294,7 +1363,7 @@ export default function DesignPage() {
                           </div>
 
                           {/* Magnifying Lens for Mockup - Desktop only (disabled when actively editing) */}
-                          {showMockupLens && mockupType === "tshirt" && !isEditingCustom && (
+                          {showMockupLens && !isEditingCustom && (
                             <div
                               className="absolute pointer-events-none border-4 border-blue-500 rounded-full shadow-2xl hidden md:block"
                               style={{
@@ -1321,12 +1390,47 @@ export default function DesignPage() {
                               >
                                 {mockupView === "front" && (
                                   <div className="relative">
-                                    <img
-                                      src="/mockups/adult/tshirt-front.png"
-                                      alt="T-Shirt Front Zoomed"
-                                      className="w-full h-auto"
-                                      style={{ width: '500px' }}
-                                    />
+                                    {mockupType === "tshirt" && (
+                                      <img
+                                        src="/mockups/adult/tshirt-front.png"
+                                        alt="T-Shirt Front Zoomed"
+                                        className="w-full h-auto"
+                                        style={{ width: '500px' }}
+                                      />
+                                    )}
+                                    {mockupType === "hoodie" && (
+                                      <img
+                                        src="/mockups/adult/hoodie-front.png"
+                                        alt="Hoodie Front Zoomed"
+                                        className="w-full h-auto"
+                                        style={{ width: '500px' }}
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                    )}
+                                    {mockupType === "sweatshirt" && (
+                                      <img
+                                        src="/mockups/adult/sweatshirt-front.png"
+                                        alt="Sweatshirt Front Zoomed"
+                                        className="w-full h-auto"
+                                        style={{ width: '500px' }}
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                    )}
+                                    {mockupType === "hat" && (
+                                      <img
+                                        src="/mockups/adult/hat-front.png"
+                                        alt="Hat Front Zoomed"
+                                        className="w-full h-auto"
+                                        style={{ width: '500px' }}
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                    )}
                                     {mockupPlacement !== "back" && (
                                       <div 
                                         className="absolute"
@@ -1355,27 +1459,50 @@ export default function DesignPage() {
                                 )}
                                 {mockupView === "back" && (
                                   <div className="relative">
-                                    <img
-                                      src="/mockups/adult/tshirt-back.png"
-                                      alt="T-Shirt Back Zoomed"
-                                      className="w-full h-auto"
-                                      style={{ width: '500px' }}
-                                      onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                        const svg = e.currentTarget.nextElementSibling as HTMLElement;
-                                        if (svg) svg.style.display = 'block';
-                                      }}
-                                    />
-                                    <svg viewBox="0 0 400 500" className="w-full h-auto" style={{ display: 'none', width: '500px' }}>
-                                      <path
-                                        d="M 80 80 L 120 50 L 150 50 L 150 20 Q 200 10 250 20 L 250 50 L 280 50 L 320 80 L 320 450 Q 320 480 300 480 L 100 480 Q 80 480 80 450 Z"
-                                        fill="#ffffff"
-                                        stroke="#e5e7eb"
-                                        strokeWidth="2"
+                                    {mockupType === "tshirt" && (
+                                      <img
+                                        src="/mockups/adult/tshirt-back.png"
+                                        alt="T-Shirt Back Zoomed"
+                                        className="w-full h-auto"
+                                        style={{ width: '500px' }}
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
                                       />
-                                      <path d="M 80 80 L 50 120 L 70 180 L 120 140 Z" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1" />
-                                      <path d="M 320 80 L 350 120 L 330 180 L 280 140 Z" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1" />
-                                    </svg>
+                                    )}
+                                    {mockupType === "hoodie" && (
+                                      <img
+                                        src="/mockups/adult/hoodie-back.png"
+                                        alt="Hoodie Back Zoomed"
+                                        className="w-full h-auto"
+                                        style={{ width: '500px' }}
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                    )}
+                                    {mockupType === "sweatshirt" && (
+                                      <img
+                                        src="/mockups/adult/sweatshirt-back.png"
+                                        alt="Sweatshirt Back Zoomed"
+                                        className="w-full h-auto"
+                                        style={{ width: '500px' }}
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                    )}
+                                    {mockupType === "hat" && (
+                                      <img
+                                        src="/mockups/adult/hat-back.png"
+                                        alt="Hat Back Zoomed"
+                                        className="w-full h-auto"
+                                        style={{ width: '500px' }}
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                    )}
                                     {mockupPlacement === "back" && (
                                       <div 
                                         className="absolute"
@@ -1461,36 +1588,61 @@ export default function DesignPage() {
                             </button>
                             <div className="bg-white rounded-lg p-4 max-w-[90vw] max-h-[90vh] overflow-auto">
                               <div className="relative">
-                                {mockupView === "front" && (
+                                {mockupView === "front" && mockupType === "tshirt" && (
                                   <img
                                     src="/mockups/adult/tshirt-front.png"
                                     alt="Enlarged mockup front"
                                     className="w-full h-auto"
                                   />
                                 )}
-                                {mockupView === "back" && (
+                                {mockupView === "front" && mockupType === "hoodie" && (
+                                  <img
+                                    src="/mockups/adult/hoodie-front.png"
+                                    alt="Enlarged hoodie front"
+                                    className="w-full h-auto"
+                                  />
+                                )}
+                                {mockupView === "front" && mockupType === "sweatshirt" && (
+                                  <img
+                                    src="/mockups/adult/sweatshirt-front.png"
+                                    alt="Enlarged sweatshirt front"
+                                    className="w-full h-auto"
+                                  />
+                                )}
+                                {mockupView === "front" && mockupType === "hat" && (
+                                  <img
+                                    src="/mockups/adult/hat-front.png"
+                                    alt="Enlarged hat front"
+                                    className="w-full h-auto"
+                                  />
+                                )}
+                                {mockupView === "back" && mockupType === "tshirt" && (
                                   <img
                                     src="/mockups/adult/tshirt-back.png"
                                     alt="Enlarged mockup back"
                                     className="w-full h-auto"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = 'none';
-                                      const svg = e.currentTarget.nextElementSibling as HTMLElement;
-                                      if (svg) svg.style.display = 'block';
-                                    }}
                                   />
                                 )}
-                                {mockupView === "back" && (
-                                  <svg viewBox="0 0 400 500" className="w-full h-auto" style={{ display: 'none' }}>
-                                    <path
-                                      d="M 80 80 L 120 50 L 150 50 L 150 20 Q 200 10 250 20 L 250 50 L 280 50 L 320 80 L 320 450 Q 320 480 300 480 L 100 480 Q 80 480 80 450 Z"
-                                      fill="#ffffff"
-                                      stroke="#e5e7eb"
-                                      strokeWidth="2"
-                                    />
-                                    <path d="M 80 80 L 50 120 L 70 180 L 120 140 Z" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1" />
-                                    <path d="M 320 80 L 350 120 L 330 180 L 280 140 Z" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1" />
-                                  </svg>
+                                {mockupView === "back" && mockupType === "hoodie" && (
+                                  <img
+                                    src="/mockups/adult/hoodie-back.png"
+                                    alt="Enlarged hoodie back"
+                                    className="w-full h-auto"
+                                  />
+                                )}
+                                {mockupView === "back" && mockupType === "sweatshirt" && (
+                                  <img
+                                    src="/mockups/adult/sweatshirt-back.png"
+                                    alt="Enlarged sweatshirt back"
+                                    className="w-full h-auto"
+                                  />
+                                )}
+                                {mockupView === "back" && mockupType === "hat" && (
+                                  <img
+                                    src="/mockups/adult/hat-back.png"
+                                    alt="Enlarged hat back"
+                                    className="w-full h-auto"
+                                  />
                                 )}
                                 {mockupView === "front" && mockupPlacement !== "back" && (
                                   <div 

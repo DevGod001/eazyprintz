@@ -17,11 +17,19 @@ export default function DesignPage() {
   const [showMockup, setShowMockup] = useState(false);
   const [mockupType, setMockupType] = useState<MockupType>("tshirt");
   const [detectedAudience, setDetectedAudience] = useState<AudienceType>("adult");
-  const [mockupPlacement, setMockupPlacement] = useState<"front" | "back" | "breast-left" | "breast-right">("front");
+  const [mockupPlacement, setMockupPlacement] = useState<"front" | "back" | "breast-left" | "breast-right" | "custom">("front");
   const [mockupView, setMockupView] = useState<"front" | "back">("front");
   
+  // Custom positioning state
+  const [customPosition, setCustomPosition] = useState({ x: 50, y: 35 }); // percentage
+  const [customScale, setCustomScale] = useState(40); // percentage width
+  const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isEditingCustom, setIsEditingCustom] = useState(false); // Track if actively editing
+  
   // Multi-position placement with checkboxes
-  const [selectedPlacements, setSelectedPlacements] = useState<("front" | "back" | "breast-left" | "breast-right")[]>(["front"]);
+  const [selectedPlacements, setSelectedPlacements] = useState<("front" | "back" | "breast-left" | "breast-right" | "custom")[]>(["front"]);
   const [autoRotate, setAutoRotate] = useState(false);
   const [currentRotationIndex, setCurrentRotationIndex] = useState(0);
   
@@ -817,16 +825,89 @@ export default function DesignPage() {
 
                           {/* Apparel with Design Overlay - Clickable Area */}
                           <div 
-                            className="relative cursor-zoom-in"
+                            className={`relative ${isEditingCustom ? "cursor-default" : "cursor-zoom-in"}`}
                             onMouseMove={(e) => {
                               const rect = e.currentTarget.getBoundingClientRect();
                               const x = e.clientX - rect.left;
                               const y = e.clientY - rect.top;
-                              setMockupLensPosition({ x, y });
+                              
+                              // Only show lens if NOT actively editing custom position
+                              if (!isEditingCustom) {
+                                setMockupLensPosition({ x, y });
+                              }
+                              
+                              // Handle dragging and resizing (only in custom mode)
+                              if (isDragging) {
+                                const deltaX = e.clientX - dragStart.x;
+                                const deltaY = e.clientY - dragStart.y;
+                                const percentX = (deltaX / rect.width) * 100;
+                                const percentY = (deltaY / rect.height) * 100;
+                                
+                                setCustomPosition(prev => ({
+                                  x: Math.max(10, Math.min(90, prev.x + percentX)),
+                                  y: Math.max(10, Math.min(90, prev.y + percentY))
+                                }));
+                                setDragStart({ x: e.clientX, y: e.clientY });
+                              } else if (isResizing) {
+                                const deltaX = e.clientX - dragStart.x;
+                                const scaleChange = (deltaX / rect.width) * 100;
+                                
+                                setCustomScale(prev => Math.max(15, Math.min(70, prev + scaleChange)));
+                                setDragStart({ x: e.clientX, y: e.clientY });
+                              }
                             }}
-                            onMouseEnter={() => setShowMockupLens(true)}
-                            onMouseLeave={() => setShowMockupLens(false)}
-                            onClick={() => setShowMockupEnlargedModal(true)}
+                            onMouseUp={() => {
+                              setIsDragging(false);
+                              setIsResizing(false);
+                            }}
+                            onMouseLeave={() => {
+                              if (!isEditingCustom) {
+                                setShowMockupLens(false);
+                              }
+                              setIsDragging(false);
+                              setIsResizing(false);
+                            }}
+                            onMouseEnter={() => {
+                              // Only show lens if NOT actively editing custom position
+                              if (!isEditingCustom) {
+                                setShowMockupLens(true);
+                              }
+                            }}
+                            onClick={(e) => {
+                              // Only allow zoom modal if NOT actively editing and not dragging
+                              if (!isEditingCustom && !isDragging && !isResizing) {
+                                setShowMockupEnlargedModal(true);
+                              }
+                            }}
+                            onTouchMove={(e) => {
+                              if (mockupPlacement === "custom" && (isDragging || isResizing) && e.touches.length === 1) {
+                                e.preventDefault();
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                
+                                if (isDragging) {
+                                  const deltaX = e.touches[0].clientX - dragStart.x;
+                                  const deltaY = e.touches[0].clientY - dragStart.y;
+                                  const percentX = (deltaX / rect.width) * 100;
+                                  const percentY = (deltaY / rect.height) * 100;
+                                  
+                                  setCustomPosition(prev => ({
+                                    x: Math.max(10, Math.min(90, prev.x + percentX)),
+                                    y: Math.max(10, Math.min(90, prev.y + percentY))
+                                  }));
+                                  setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                                } else if (isResizing) {
+                                  const deltaX = e.touches[0].clientX - dragStart.x;
+                                  const scaleChange = (deltaX / rect.width) * 100;
+                                  
+                                  setCustomScale(prev => Math.max(15, Math.min(70, prev + scaleChange)));
+                                  setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                                }
+                              }
+                            }}
+                            onTouchEnd={() => {
+                              setIsDragging(false);
+                              setIsResizing(false);
+                            }}
                           >
                             {/* Background Pattern for Depth */}
                             <div className="absolute inset-0 bg-gradient-to-b from-gray-50 to-gray-100"></div>
@@ -973,27 +1054,120 @@ export default function DesignPage() {
                               {/* Design Overlay - Positioned based on placement selection */}
                               {mockupView === "front" && mockupPlacement !== "back" && (
                                 <div 
-                                  className="absolute"
+                                  className={mockupPlacement === "custom" && isEditingCustom ? "absolute cursor-move select-none" : "absolute select-none"}
                                   style={{
-                                    top: mockupPlacement === "front" ? "30%" :
+                                    top: mockupPlacement === "custom" ? `${customPosition.y}%` :
+                                         mockupPlacement === "front" ? "30%" :
                                          mockupPlacement === "breast-left" || mockupPlacement === "breast-right" ? "25%" : "30%",
-                                    left: mockupPlacement === "breast-left" ? "30%" :
+                                    left: mockupPlacement === "custom" ? `${customPosition.x}%` :
+                                          mockupPlacement === "breast-left" ? "30%" :
                                           mockupPlacement === "breast-right" ? "70%" : "50%",
                                     transform: "translate(-50%, -50%)",
-                                    width: mockupPlacement === "front" ? (mockupType === "hat" ? "35%" : "40%") :
+                                    width: mockupPlacement === "custom" ? `${customScale}%` :
+                                           mockupPlacement === "front" ? (mockupType === "hat" ? "35%" : "40%") :
                                            mockupPlacement === "breast-left" || mockupPlacement === "breast-right" ? "20%" : "40%",
-                                    maxWidth: mockupPlacement === "front" ? "180px" : "80px",
+                                    maxWidth: mockupPlacement === "custom" ? "none" : (mockupPlacement === "front" ? "180px" : "80px"),
                                     zIndex: 5
+                                  }}
+                                  onMouseDown={(e) => {
+                                    if (mockupPlacement === "custom" && isEditingCustom) {
+                                      e.preventDefault();
+                                      setIsDragging(true);
+                                      const rect = e.currentTarget.parentElement!.getBoundingClientRect();
+                                      setDragStart({
+                                        x: e.clientX,
+                                        y: e.clientY
+                                      });
+                                    }
+                                  }}
+                                  onTouchStart={(e) => {
+                                    if (mockupPlacement === "custom" && isEditingCustom && e.touches.length === 1) {
+                                      e.preventDefault();
+                                      setIsDragging(true);
+                                      const rect = e.currentTarget.parentElement!.getBoundingClientRect();
+                                      setDragStart({
+                                        x: e.touches[0].clientX,
+                                        y: e.touches[0].clientY
+                                      });
+                                    }
                                   }}
                                 >
                                   <img
                                     src={imageUrl}
                                     alt="Design preview on apparel"
-                                    className="w-full h-auto object-contain"
+                                    className="w-full h-auto object-contain pointer-events-none"
                                     style={{
                                       filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.15))"
                                     }}
+                                    draggable="false"
                                   />
+                                  
+                                  {/* Custom Position Controls - Only show when actively editing */}
+                                  {mockupPlacement === "custom" && isEditingCustom && (
+                                    <>
+                                      {/* Bounding Box */}
+                                      <div className="absolute inset-0 border-2 border-blue-500 pointer-events-none">
+                                        {/* Corner Handles for Resizing */}
+                                        <div 
+                                          className="absolute -top-2 -left-2 w-4 h-4 bg-blue-500 rounded-full cursor-nwse-resize pointer-events-auto"
+                                          onMouseDown={(e) => {
+                                            e.stopPropagation();
+                                            setIsResizing(true);
+                                            setDragStart({ x: e.clientX, y: e.clientY });
+                                          }}
+                                          onTouchStart={(e) => {
+                                            e.stopPropagation();
+                                            setIsResizing(true);
+                                            setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                                          }}
+                                        ></div>
+                                        <div 
+                                          className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full cursor-nesw-resize pointer-events-auto"
+                                          onMouseDown={(e) => {
+                                            e.stopPropagation();
+                                            setIsResizing(true);
+                                            setDragStart({ x: e.clientX, y: e.clientY });
+                                          }}
+                                          onTouchStart={(e) => {
+                                            e.stopPropagation();
+                                            setIsResizing(true);
+                                            setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                                          }}
+                                        ></div>
+                                        <div 
+                                          className="absolute -bottom-2 -left-2 w-4 h-4 bg-blue-500 rounded-full cursor-nesw-resize pointer-events-auto"
+                                          onMouseDown={(e) => {
+                                            e.stopPropagation();
+                                            setIsResizing(true);
+                                            setDragStart({ x: e.clientX, y: e.clientY });
+                                          }}
+                                          onTouchStart={(e) => {
+                                            e.stopPropagation();
+                                            setIsResizing(true);
+                                            setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                                          }}
+                                        ></div>
+                                        <div 
+                                          className="absolute -bottom-2 -right-2 w-4 h-4 bg-blue-500 rounded-full cursor-nwse-resize pointer-events-auto"
+                                          onMouseDown={(e) => {
+                                            e.stopPropagation();
+                                            setIsResizing(true);
+                                            setDragStart({ x: e.clientX, y: e.clientY });
+                                          }}
+                                          onTouchStart={(e) => {
+                                            e.stopPropagation();
+                                            setIsResizing(true);
+                                            setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                                          }}
+                                        ></div>
+                                      </div>
+                                      
+                                      {/* Position & Size Indicator */}
+                                      <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+                                        {customScale.toFixed(0)}% • {customPosition.x.toFixed(0)}%, {customPosition.y.toFixed(0)}%
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                               )}
                               
@@ -1023,13 +1197,13 @@ export default function DesignPage() {
                             </div>
                           </div>
 
-                          {/* Placement Controls with Multi-Position Checkboxes */}
+                          {/* Placement Controls with Multi-Position Checkboxes + Custom Position */}
                           <div className="bg-gray-800 px-4 py-3 border-t border-gray-700">
-                            <p className="text-xs text-white mb-2 font-semibold">Design Placement - Check multiple positions:</p>
+                            <p className="text-xs text-white mb-2 font-semibold">Design Placement - Select mode:</p>
                             <div className="grid grid-cols-2 gap-2 mb-3">
                               {(mockupType === "hat" 
-                                ? (["front", "back"] as const)
-                                : (["front", "back", "breast-left", "breast-right"] as const)
+                                ? (["front", "back", "custom"] as const)
+                                : (["front", "back", "breast-left", "breast-right", "custom"] as const)
                               ).map((placement) => (
                                 <label
                                   key={placement}
@@ -1048,6 +1222,10 @@ export default function DesignPage() {
                                         setMockupPlacement(placement);
                                         if (placement === "back") setMockupView("back");
                                         else setMockupView("front");
+                                        // Enable editing mode when custom is selected
+                                        if (placement === "custom") {
+                                          setIsEditingCustom(true);
+                                        }
                                       } else {
                                         const newPlacements = selectedPlacements.filter(p => p !== placement);
                                         setSelectedPlacements(newPlacements.length > 0 ? newPlacements : ["front"]);
@@ -1063,7 +1241,8 @@ export default function DesignPage() {
                                   <span className="text-xs font-semibold">
                                     {placement === "front" ? "Front Center" : 
                                      placement === "back" ? "Back Center" :
-                                     placement === "breast-left" ? "Left Breast" : "Right Breast"}
+                                     placement === "breast-left" ? "Left Breast" : 
+                                     placement === "breast-right" ? "Right Breast" : "Custom Position"}
                                   </span>
                                 </label>
                               ))}
@@ -1114,8 +1293,8 @@ export default function DesignPage() {
                             </p>
                           </div>
 
-                          {/* Magnifying Lens for Mockup - Desktop only */}
-                          {showMockupLens && mockupType === "tshirt" && (
+                          {/* Magnifying Lens for Mockup - Desktop only (disabled when actively editing) */}
+                          {showMockupLens && mockupType === "tshirt" && !isEditingCustom && (
                             <div
                               className="absolute pointer-events-none border-4 border-blue-500 rounded-full shadow-2xl hidden md:block"
                               style={{
@@ -1152,13 +1331,16 @@ export default function DesignPage() {
                                       <div 
                                         className="absolute"
                                         style={{
-                                          top: mockupPlacement === "front" ? "30%" :
+                                          top: mockupPlacement === "custom" ? `${customPosition.y}%` :
+                                               mockupPlacement === "front" ? "30%" :
                                                mockupPlacement === "breast-left" || mockupPlacement === "breast-right" ? "25%" : "30%",
-                                          left: mockupPlacement === "breast-left" ? "30%" :
+                                          left: mockupPlacement === "custom" ? `${customPosition.x}%` :
+                                                mockupPlacement === "breast-left" ? "30%" :
                                                 mockupPlacement === "breast-right" ? "70%" : "50%",
                                           transform: "translate(-50%, -50%)",
-                                          width: mockupPlacement === "front" ? "40%" : "20%",
-                                          maxWidth: mockupPlacement === "front" ? "180px" : "80px",
+                                          width: mockupPlacement === "custom" ? `${customScale}%` :
+                                                 mockupPlacement === "front" ? "40%" : "20%",
+                                          maxWidth: mockupPlacement === "custom" ? "none" : (mockupPlacement === "front" ? "180px" : "80px"),
                                         }}
                                       >
                                         <img
@@ -1220,11 +1402,37 @@ export default function DesignPage() {
                             </div>
                           )}
                           
-                          {/* Tap to Enlarge Badge - Mobile only */}
-                          <div className="md:hidden absolute bottom-2 right-2 bg-black bg-opacity-75 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 z-10">
-                            <span>🔍</span>
-                            <span>Tap to Enlarge</span>
-                          </div>
+                          {/* Tap to Enlarge Badge - Mobile only (hidden when actively editing) */}
+                          {!isEditingCustom && (
+                            <div className="md:hidden absolute bottom-2 right-2 bg-black bg-opacity-75 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 z-10">
+                              <span>🔍</span>
+                              <span>Tap to Enlarge</span>
+                            </div>
+                          )}
+                          
+                          {/* Custom Positioning Mode Indicator & Done Button */}
+                          {mockupPlacement === "custom" && isEditingCustom && (
+                            <>
+                              <div className="absolute top-2 left-4 bg-blue-600 text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-2 z-10 shadow-lg">
+                                <span>✋</span>
+                                <span className="hidden md:inline">Custom Positioning Active</span>
+                                <span className="md:hidden">Editing</span>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Exit editing mode but KEEP custom placement
+                                  setIsEditingCustom(false);
+                                  setIsDragging(false);
+                                  setIsResizing(false);
+                                }}
+                                className="absolute top-2 right-4 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 z-10 shadow-lg transition"
+                              >
+                                <span>✓</span>
+                                <span>Done</span>
+                              </button>
+                            </>
+                          )}
                         </div>
 
                         {/* Print Quality Notice for Mockup */}
@@ -1288,14 +1496,17 @@ export default function DesignPage() {
                                   <div 
                                     className="absolute"
                                     style={{
-                                      top: mockupPlacement === "front" ? "30%" :
+                                      top: mockupPlacement === "custom" ? `${customPosition.y}%` :
+                                           mockupPlacement === "front" ? "30%" :
                                            mockupPlacement === "breast-left" || mockupPlacement === "breast-right" ? "25%" : "30%",
-                                      left: mockupPlacement === "breast-left" ? "30%" :
+                                      left: mockupPlacement === "custom" ? `${customPosition.x}%` :
+                                            mockupPlacement === "breast-left" ? "30%" :
                                             mockupPlacement === "breast-right" ? "70%" : "50%",
                                       transform: "translate(-50%, -50%)",
-                                      width: mockupPlacement === "front" ? (mockupType === "hat" ? "35%" : "40%") :
+                                      width: mockupPlacement === "custom" ? `${customScale}%` :
+                                             mockupPlacement === "front" ? (mockupType === "hat" ? "35%" : "40%") :
                                              mockupPlacement === "breast-left" || mockupPlacement === "breast-right" ? "20%" : "40%",
-                                      maxWidth: mockupPlacement === "front" ? "180px" : "80px",
+                                      maxWidth: mockupPlacement === "custom" ? "none" : (mockupPlacement === "front" ? "180px" : "80px"),
                                       zIndex: 5
                                     }}
                                   >

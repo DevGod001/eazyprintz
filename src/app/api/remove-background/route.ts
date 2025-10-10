@@ -107,9 +107,9 @@ export async function POST(request: NextRequest) {
         const avgBgIntensity = (bgR + bgG + bgB) / 3;
         const isDarkBackground = avgBgIntensity < 100;
         
-        // Adjust thresholds based on background type
-        const colorThreshold = isDarkBackground ? 50 : 45; // More lenient for dark backgrounds
-        const edgeThreshold = isDarkBackground ? 70 : 65;
+        // More aggressive thresholds to remove all remnants
+        const colorThreshold = isDarkBackground ? 60 : 55; // More aggressive
+        const edgeThreshold = isDarkBackground ? 90 : 85; // Much more aggressive for edges
         
         console.log(`Background type: ${isDarkBackground ? 'dark' : 'light'}, using thresholds: ${colorThreshold}, ${edgeThreshold}`);
         
@@ -136,17 +136,16 @@ export async function POST(request: NextRequest) {
             Math.abs(b - avgIntensity)
           );
           
-          // If pixel is very similar to background color
-          if (colorDistance < colorThreshold && colorVariance < 50) {
+          // If pixel is very similar to background color - make it fully transparent
+          if (colorDistance < colorThreshold && colorVariance < 60) {
             pixels[i + 3] = 0; // Fully transparent
             transparentPixels++;
           }
-          // For edge pixels (similar but not exact match)
-          else if (colorDistance < edgeThreshold && colorVariance < 70) {
-            // Gradual transparency based on distance
-            const alphaValue = Math.min(255, (colorDistance / edgeThreshold) * 255);
-            pixels[i + 3] = Math.round(alphaValue);
-            if (alphaValue < 200) transparentPixels++;
+          // For edge pixels (similar but not exact match) - still make fully transparent
+          // This prevents remnants
+          else if (colorDistance < edgeThreshold && colorVariance < 90) {
+            pixels[i + 3] = 0; // Fully transparent (no gradual transparency)
+            transparentPixels++;
           }
         }
         

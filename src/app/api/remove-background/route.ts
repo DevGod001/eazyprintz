@@ -41,27 +41,94 @@ export async function POST(request: NextRequest) {
       .raw()
       .toBuffer({ resolveWithObject: true })
       .then(({ data, info }) => {
-        // Process pixels: detect and remove background color
         const pixels = new Uint8Array(data);
+        const width = info.width;
+        const height = info.height;
+        const channels = info.channels;
         
+        // Sample multiple edge pixels to better detect background color
+        const samplePoints = [];
+        
+        // Top edge
+        for (let x = 0; x < width; x += Math.floor(width / 10)) {
+          samplePoints.push(x * channels);
+        }
+        
+        // Bottom edge
+        for (let x = 0; x < width; x += Math.floor(width / 10)) {
+          samplePoints.push(((height - 1) * width + x) * channels);
+        }
+        
+        // Left edge
+        for (let y = 0; y < height; y += Math.floor(height / 10)) {
+          samplePoints.push(y * width * channels);
+        }
+        
+        // Right edge
+        for (let y = 0; y < height; y += Math.floor(height / 10)) {
+          samplePoints.push((y * width + (width - 1)) * channels);
+        }
+        
+        // Calculate average background color from edge samples
+        let bgR = 0, bgG = 0, bgB = 0;
+        let validSamples = 0;
+        
+        for (const sample of samplePoints) {
+          if (sample + 2 < pixels.length) {
+            const r = pixels[sample];
+            const g = pixels[sample + 1];
+            const b = pixels[sample + 2];
+            
+            // Only use samples that are relatively uniform (likely background)
+            const variance = Math.max(
+              Math.abs(r - g),
+              Math.abs(r - b),
+              Math.abs(g - b)
+            );
+            
+            if (variance < 40) {
+              bgR += r;
+              bgG += g;
+              bgB += b;
+              validSamples++;
+            }
+          }
+        }
+        
+        if (validSamples > 0) {
+          bgR = Math.round(bgR / validSamples);
+          bgG = Math.round(bgG / validSamples);
+          bgB = Math.round(bgB / validSamples);
+        }
+        
+        console.log(`Detected background color from ${validSamples} samples: RGB(${bgR}, ${bgG}, ${bgB})`);
+        
+        // Determine if background is dark or light
+        const avgBgIntensity = (bgR + bgG + bgB) / 3;
+        const isDarkBackground = avgBgIntensity < 100;
+        
+        // Adjust thresholds based on background type
+        const colorThreshold = isDarkBackground ? 50 : 45; // More lenient for dark backgrounds
+        const edgeThreshold = isDarkBackground ? 70 : 65;
+        
+        console.log(`Background type: ${isDarkBackground ? 'dark' : 'light'}, using thresholds: ${colorThreshold}, ${edgeThreshold}`);
+        
+        // Process all pixels
         let transparentPixels = 0;
-        for (let i = 0; i < pixels.length; i += info.channels) {
+        
+        for (let i = 0; i < pixels.length; i += channels) {
           const r = pixels[i];
           const g = pixels[i + 1];
           const b = pixels[i + 2];
           
-          // Detect white or near-white backgrounds (for white backgrounds)
-          const isWhitish = r > 235 && g > 235 && b > 235;
+          // Calculate color distance from detected background
+          const colorDistance = Math.sqrt(
+            Math.pow(r - bgR, 2) +
+            Math.pow(g - bgG, 2) +
+            Math.pow(b - bgB, 2)
+          );
           
-          // Detect blue backgrounds (common in product photos)
-          // Blue channel dominant, with r and g being lower
-          const isBlueBackground = b > 100 && b > r + 20 && b > g + 20;
-          
-          // More aggressive white/light color detection
-          const isLightBackground = r > 200 && g > 200 && b > 200;
-          
-          // Calculate color distance for gradual transparency
-          // This helps remove edge artifacts
+          // Calculate color variance (how uniform the color is)
           const avgIntensity = (r + g + b) / 3;
           const colorVariance = Math.max(
             Math.abs(r - avgIntensity),
@@ -69,17 +136,17 @@ export async function POST(request: NextRequest) {
             Math.abs(b - avgIntensity)
           );
           
-          // If it's a background color (low variance, light or blue)
-          if ((isWhitish || isLightBackground || isBlueBackground) && colorVariance < 40) {
-            pixels[i + 3] = 0; // Set alpha to 0 (transparent)
+          // If pixel is very similar to background color
+          if (colorDistance < colorThreshold && colorVariance < 50) {
+            pixels[i + 3] = 0; // Fully transparent
             transparentPixels++;
           }
-          // For edge pixels, use gradual transparency
-          else if (colorVariance < 60 && avgIntensity > 180) {
-            // Gradually fade based on how close to background color
-            const alphaValue = Math.min(255, colorVariance * 4);
-            pixels[i + 3] = alphaValue;
-            transparentPixels++;
+          // For edge pixels (similar but not exact match)
+          else if (colorDistance < edgeThreshold && colorVariance < 70) {
+            // Gradual transparency based on distance
+            const alphaValue = Math.min(255, (colorDistance / edgeThreshold) * 255);
+            pixels[i + 3] = Math.round(alphaValue);
+            if (alphaValue < 200) transparentPixels++;
           }
         }
         

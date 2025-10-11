@@ -1875,8 +1875,8 @@ export default function DesignPage() {
                   )}
                 </div>
 
-                {/* Mockup type selector */}
-                <div className="mb-4">
+                {/* Mockup type selector - REMOVED: Old mockup view no longer needed */}
+                <div className="mb-4 hidden">
                   <div className="flex gap-2 mb-2">
                     <button
                       onClick={() => setShowMockup(!showMockup)}

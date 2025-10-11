@@ -55,6 +55,9 @@ export default function ProductPreviewModal({
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  
+  // Design dimensions tracking
+  const [originalDesignDimensions, setOriginalDesignDimensions] = useState<{ width: number; height: number } | null>(null);
 
   // Popular sizes with pricing
   const popularSizes = [
@@ -122,6 +125,58 @@ export default function ProductPreviewModal({
       setSelectedSize(product.sizes[0] || '');
     }
   }, [product]);
+
+  // Detect original design dimensions
+  useEffect(() => {
+    if (designUrl && !originalDesignDimensions) {
+      const img = new Image();
+      img.onload = () => {
+        // Assume 300 DPI for print quality
+        const widthInches = img.width / 300;
+        const heightInches = img.height / 300;
+        setOriginalDesignDimensions({
+          width: Math.round(widthInches * 10) / 10,
+          height: Math.round(heightInches * 10) / 10
+        });
+      };
+      img.src = designUrl;
+    }
+  }, [designUrl, originalDesignDimensions]);
+
+  // Get current DTF dimensions in inches
+  const getCurrentDTFDimensions = () => {
+    if (sizeType === 'popular') {
+      const size = popularSizes.find(s => s.value === selectedPopularSize);
+      if (size) {
+        const [width, height] = size.label.replace(/"/g, '').split(' × ').map(Number);
+        return { width, height };
+      }
+    }
+    return {
+      width: parseFloat(customWidth) || 10,
+      height: parseFloat(customHeight) || 10
+    };
+  };
+
+  // Calculate visual scale percentage based on DTF size
+  // Assuming the printable area on apparel is approximately 12-14 inches wide
+  const calculateVisualScale = () => {
+    const APPAREL_PRINT_WIDTH = 13; // inches - typical print area width
+    const dtfDimensions = getCurrentDTFDimensions();
+    
+    if (printPlacement === 'front' || printPlacement === 'back') {
+      // For center placements, scale based on width
+      return Math.min((dtfDimensions.width / APPAREL_PRINT_WIDTH) * 100, 70);
+    } else if (printPlacement === 'breast-left' || printPlacement === 'breast-right') {
+      // For breast placements, typically smaller (max 4-5 inches)
+      return Math.min((dtfDimensions.width / APPAREL_PRINT_WIDTH) * 100, 25);
+    } else {
+      // For custom placement, use the customScale
+      return customScale;
+    }
+  };
+
+  const visualScale = calculateVisualScale();
 
   if (!isOpen || !product) return null;
 
@@ -282,8 +337,7 @@ export default function ProductPreviewModal({
                               printPlacement === 'breast-left' ? '30%' :
                               printPlacement === 'breast-right' ? '70%' : '50%',
                         transform: 'translate(-50%, -50%)',
-                        width: printPlacement === 'custom' ? `${customScale}%` :
-                               printPlacement === 'front' || printPlacement === 'back' ? '40%' : '20%',
+                        width: `${visualScale}%`,
                         zIndex: 5
                       }}
                       onMouseDown={(e) => {
@@ -343,9 +397,17 @@ export default function ProductPreviewModal({
                             ></div>
                           </div>
                           
-                          {/* Position & Size Indicator */}
+                          {/* Position & Size Indicator with actual dimensions */}
                           <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
-                            {customScale.toFixed(0)}% • {customPosition.x.toFixed(0)}%, {customPosition.y.toFixed(0)}%
+                            {(() => {
+                              const dtfDims = getCurrentDTFDimensions();
+                              const scaleFactor = customScale / 100;
+                              const APPAREL_PRINT_WIDTH = 13;
+                              const actualWidth = (APPAREL_PRINT_WIDTH * scaleFactor).toFixed(1);
+                              const aspectRatio = originalDesignDimensions ? originalDesignDimensions.height / originalDesignDimensions.width : 1;
+                              const actualHeight = (parseFloat(actualWidth) * aspectRatio).toFixed(1);
+                              return `${actualWidth}" × ${actualHeight}"`;
+                            })()}
                           </div>
                         </>
                       )}
@@ -464,6 +526,46 @@ export default function ProductPreviewModal({
                     </div>
                   </div>
                 )}
+
+                {/* Design Size Info */}
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start justify-between gap-2 text-xs">
+                    <div className="flex-1">
+                      <p className="font-bold text-blue-900 mb-1">📐 Design Info:</p>
+                      {originalDesignDimensions && (
+                        <p className="text-blue-800">
+                          <span className="font-semibold">Original:</span> {originalDesignDimensions.width}" × {originalDesignDimensions.height}"
+                        </p>
+                      )}
+                      <p className="text-blue-800 mt-1">
+                        <span className="font-semibold">Print Size:</span> {(() => {
+                          const dims = getCurrentDTFDimensions();
+                          return `${dims.width}" × ${dims.height}"`;
+                        })()}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-16 h-16 bg-white rounded border-2 border-blue-300 flex items-center justify-center relative overflow-hidden">
+                        <div 
+                          className="absolute bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[8px] font-bold"
+                          style={{
+                            width: `${Math.min(visualScale * 0.8, 90)}%`,
+                            height: `${Math.min(visualScale * 0.8, 90)}%`,
+                          }}
+                        >
+                          {(() => {
+                            const dims = getCurrentDTFDimensions();
+                            return `${dims.width}"×${dims.height}"`;
+                          })()}
+                        </div>
+                      </div>
+                      <p className="text-[9px] text-blue-700 mt-1 font-semibold">Preview</p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-blue-700 mt-2 italic">
+                    💡 The design on the apparel shows actual print size
+                  </p>
+                </div>
 
                 {/* DTF Quantity */}
                 <div className="mb-4">

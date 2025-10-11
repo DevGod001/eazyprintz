@@ -438,7 +438,7 @@ export default function ProductPreviewModal({
                   <div className="mb-4">
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">Width (in)</label>
+                        <label className="block text-xs font-semibold text-gray-900 mb-1">Width (in)</label>
                         <input
                           type="number"
                           value={customWidth}
@@ -446,11 +446,11 @@ export default function ProductPreviewModal({
                           step="0.1"
                           min="1"
                           max="20"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 font-semibold"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">Height (in)</label>
+                        <label className="block text-xs font-semibold text-gray-900 mb-1">Height (in)</label>
                         <input
                           type="number"
                           value={customHeight}
@@ -458,7 +458,7 @@ export default function ProductPreviewModal({
                           step="0.1"
                           min="1"
                           max="20"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 font-semibold"
                         />
                       </div>
                     </div>
@@ -467,13 +467,13 @@ export default function ProductPreviewModal({
 
                 {/* DTF Quantity */}
                 <div className="mb-4">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
                     DTF Transfer Quantity
                   </label>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setDtfQuantity(Math.max(1, dtfQuantity - 1))}
-                      className="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold"
+                      className="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold text-gray-900"
                     >
                       −
                     </button>
@@ -481,11 +481,11 @@ export default function ProductPreviewModal({
                       type="number"
                       value={dtfQuantity}
                       onChange={(e) => setDtfQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-20 text-center border-2 border-gray-300 rounded-lg py-1 font-semibold"
+                      className="w-20 text-center border-2 border-gray-300 rounded-lg py-1 font-semibold text-gray-900"
                     />
                     <button
                       onClick={() => setDtfQuantity(dtfQuantity + 1)}
-                      className="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold"
+                      className="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold text-gray-900"
                     >
                       +
                     </button>
@@ -495,17 +495,17 @@ export default function ProductPreviewModal({
                 {/* DTF Pricing Display */}
                 <div className="bg-white rounded-lg p-3 border border-gray-200">
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">Price per transfer:</span>
-                    <span className="font-bold">${dtfPricing.pricePerUnit}</span>
+                    <span className="text-gray-900 font-semibold">Price per transfer:</span>
+                    <span className="font-bold text-gray-900">${dtfPricing.pricePerUnit}</span>
                   </div>
                   {dtfPricing.discount > 0 && (
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="text-green-600">Bulk discount:</span>
-                      <span className="text-green-600 font-bold">{dtfPricing.discount}% off</span>
+                      <span className="text-green-700 font-semibold">Bulk discount:</span>
+                      <span className="text-green-700 font-bold">{dtfPricing.discount}% off</span>
                     </div>
                   )}
                   <div className="border-t pt-2 flex justify-between items-center">
-                    <span className="font-bold">DTF Total:</span>
+                    <span className="font-bold text-gray-900">DTF Total:</span>
                     <span className="text-xl font-bold text-green-600">${dtfPricing.total}</span>
                   </div>
                 </div>
@@ -524,7 +524,7 @@ export default function ProductPreviewModal({
 
               {/* Print Placement */}
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
                   Print Placement
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -569,7 +569,7 @@ export default function ProductPreviewModal({
 
               {/* Color Selection */}
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
                   Color: {selectedColor}
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -591,7 +591,7 @@ export default function ProductPreviewModal({
 
               {/* Size Selection */}
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
                   Size: {selectedSize}
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -613,13 +613,13 @@ export default function ProductPreviewModal({
 
               {/* Quantity */}
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
                   Quantity
                 </label>
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="w-10 h-10 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold"
+                    className="w-10 h-10 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold text-gray-900"
                   >
                     −
                   </button>
@@ -627,11 +627,11 @@ export default function ProductPreviewModal({
                     type="number"
                     value={quantity}
                     onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-20 text-center border-2 border-gray-300 rounded-lg py-2 font-semibold"
+                    className="w-20 text-center border-2 border-gray-300 rounded-lg py-2 font-semibold text-gray-900"
                   />
                   <button
                     onClick={() => setQuantity(quantity + 1)}
-                    className="w-10 h-10 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold"
+                    className="w-10 h-10 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold text-gray-900"
                   >
                     +
                   </button>
@@ -642,12 +642,12 @@ export default function ProductPreviewModal({
               <div className="border-t pt-6">
                 <div className="bg-gray-50 rounded-lg p-4 mb-4">
                   <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-600">DTF Transfers ({dtfQuantity}x):</span>
-                    <span className="font-bold">${dtfPricing.total}</span>
+                    <span className="text-gray-900 font-semibold">DTF Transfers ({dtfQuantity}x):</span>
+                    <span className="font-bold text-gray-900">${dtfPricing.total}</span>
                   </div>
                   <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-600">Apparel ({quantity}x):</span>
-                    <span className="font-bold">${(product.basePrice * quantity).toFixed(2)}</span>
+                    <span className="text-gray-900 font-semibold">Apparel ({quantity}x):</span>
+                    <span className="font-bold text-gray-900">${(product.basePrice * quantity).toFixed(2)}</span>
                   </div>
                   <div className="border-t border-gray-300 pt-2 mt-2 flex justify-between items-center">
                     <span className="text-lg font-bold text-gray-900">Grand Total:</span>

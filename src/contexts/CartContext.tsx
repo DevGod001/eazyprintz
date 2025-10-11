@@ -14,6 +14,11 @@ export interface CartItem {
   type: string;
   hasCustomPrint?: boolean;
   designUrl?: string;
+  printPlacement?: 'front' | 'back' | 'breast-left' | 'breast-right' | 'custom';
+  customPosition?: { x: number; y: number };
+  customScale?: number;
+  printSize?: string;
+  dtfQuantity?: number;
 }
 
 interface CartContextType {

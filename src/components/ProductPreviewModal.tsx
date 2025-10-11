@@ -422,10 +422,10 @@ export default function ProductPreviewModal({
                     <select
                       value={selectedPopularSize}
                       onChange={(e) => setSelectedPopularSize(e.target.value)}
-                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-900 font-medium"
                     >
                       {popularSizes.map((size) => (
-                        <option key={size.value} value={size.value}>
+                        <option key={size.value} value={size.value} className="text-gray-900 bg-white">
                           {size.label} - ${size.price} each
                         </option>
                       ))}
@@ -553,8 +553,16 @@ export default function ProductPreviewModal({
                   ))}
                 </div>
                 {printPlacement === 'custom' && isEditingCustom && (
-                  <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-800">
-                    <strong>Custom Positioning Active:</strong> Drag to move, use corner handles to resize
+                  <div className="mt-2 space-y-2">
+                    <div className="p-2 bg-blue-50 rounded text-xs text-blue-800">
+                      <strong>Custom Positioning Active:</strong> Drag to move, use corner handles to resize
+                    </div>
+                    <button
+                      onClick={() => setIsEditingCustom(false)}
+                      className="w-full bg-green-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-700 transition"
+                    >
+                      ✓ Done Editing
+                    </button>
                   </div>
                 )}
               </div>

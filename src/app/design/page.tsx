@@ -20,23 +20,18 @@ export default function DesignPage() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [processingType, setProcessingType] = useState<"generate" | "optimize" | "remove-bg" | null>(null);
   
-  // Background detection
   const [hasTransparency, setHasTransparency] = useState(false);
   
-  // New modal state for product selection flow
   const [showProductSelection, setShowProductSelection] = useState(false);
   const [showProductPreview, setShowProductPreview] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<typeof products[0] | null>(null);
   
-  // Magnifying lens state for design preview
   const [showLens, setShowLens] = useState(false);
   const [lensPosition, setLensPosition] = useState({ x: 0, y: 0 });
   const [showEnlargedModal, setShowEnlargedModal] = useState(false);
 
-  // Check if image has transparency
   const checkImageTransparency = (imageUrl: string) => {
     const img = new Image();
-    // Don't set crossOrigin for blob URLs
     if (!imageUrl.startsWith('blob:')) {
       img.crossOrigin = "anonymous";
     }
@@ -59,7 +54,6 @@ export default function DesignPage() {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
         
-        // Check if any pixel has alpha < 255 (transparent)
         let hasTransparentPixel = false;
         for (let i = 3; i < data.length; i += 4) {
           if (data[i] < 255) {
@@ -110,7 +104,6 @@ export default function DesignPage() {
     setUploadedImage(null);
 
     try {
-      // Generate 3 variations
       const variations = ["", " - variation 1", " - variation 2"];
       const imageUrls: string[] = [];
 
@@ -136,7 +129,6 @@ export default function DesignPage() {
           const url = URL.createObjectURL(blob);
           imageUrls.push(url);
           
-          // Update UI as each image generates
           setGeneratedImages([...imageUrls]);
         } else {
           const data = await response.json();
@@ -165,7 +157,6 @@ export default function DesignPage() {
     }
   };
 
-  // Helper function to convert blob URL to base64
   const blobToBase64 = async (blobUrl: string): Promise<string> => {
     const response = await fetch(blobUrl);
     const blob = await response.blob();
@@ -292,7 +283,6 @@ export default function DesignPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
@@ -301,10 +291,7 @@ export default function DesignPage() {
             </Link>
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-600">DTF Design Studio</span>
-              <Link
-                href="/cart"
-                className="relative text-gray-600 hover:text-gray-900 transition"
-              >
+              <Link href="/cart" className="relative text-gray-600 hover:text-gray-900 transition">
                 <span className="text-2xl">🛒</span>
                 {getCartCount() > 0 && (
                   <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
@@ -312,10 +299,7 @@ export default function DesignPage() {
                   </span>
                 )}
               </Link>
-              <Link
-                href="/"
-                className="text-gray-600 hover:text-gray-900 transition"
-              >
+              <Link href="/" className="text-gray-600 hover:text-gray-900 transition">
                 ← Home
               </Link>
             </div>
@@ -323,7 +307,6 @@ export default function DesignPage() {
         </nav>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
@@ -335,11 +318,9 @@ export default function DesignPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Input Section */}
           <div className="bg-white rounded-lg shadow-md p-8">
             <h2 className="text-2xl font-bold mb-6">Design Input</h2>
 
-            {/* Tabs */}
             <div className="flex gap-2 mb-6 border-b">
               <button
                 onClick={() => {
@@ -369,7 +350,6 @@ export default function DesignPage() {
             </div>
 
             {!uploadedImage ? (
-              /* AI Generation Tab */
               <div>
                 <div className="mb-6">
                   <label className="block text-gray-700 font-semibold mb-2">
@@ -412,7 +392,6 @@ export default function DesignPage() {
                 </div>
               </div>
             ) : (
-              /* Upload Tab */
               <div>
                 <div className="mb-6">
                   <label className="block text-gray-700 font-semibold mb-2">
@@ -426,10 +405,7 @@ export default function DesignPage() {
                       onChange={handleFileUpload}
                       className="hidden"
                     />
-                    <label
-                      htmlFor="file-upload"
-                      className="cursor-pointer"
-                    >
+                    <label htmlFor="file-upload" className="cursor-pointer">
                       <div className="text-4xl mb-2">📁</div>
                       <p className="text-gray-600">
                         Click to upload or drag and drop
@@ -454,12 +430,10 @@ export default function DesignPage() {
             )}
           </div>
 
-          {/* Output Section */}
           <div className="bg-white rounded-lg shadow-md p-4 md:p-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
               <h2 className="text-2xl font-bold">Design Preview</h2>
               
-              {/* Optimization Buttons */}
               {imageUrl && (
                 <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                   <button
@@ -518,10 +492,8 @@ export default function DesignPage() {
             </div>
 
             {loading && processingType === "generate" ? (
-              /* Loading Animation */
               <div className="flex items-center justify-center h-96 bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 rounded-lg overflow-hidden relative">
                 <div className="absolute inset-0">
-                  {/* Animated stars */}
                   <div className="absolute w-1 h-1 bg-white rounded-full animate-twinkle" style={{ top: "20%", left: "10%", animationDelay: "0s" }}></div>
                   <div className="absolute w-1 h-1 bg-white rounded-full animate-twinkle" style={{ top: "40%", left: "20%", animationDelay: "0.5s" }}></div>
                   <div className="absolute w-2 h-2 bg-yellow-200 rounded-full animate-twinkle" style={{ top: "60%", left: "80%", animationDelay: "1s" }}></div>
@@ -535,7 +507,6 @@ export default function DesignPage() {
                 </div>
                 
                 <div className="relative z-10 text-center px-8">
-                  {/* Animated printing elements */}
                   <div className="mb-6 relative">
                     <div className="text-6xl animate-bounce">🎨</div>
                     <div className="absolute -top-2 -right-2 text-3xl animate-spin-slow">✨</div>
@@ -554,7 +525,6 @@ export default function DesignPage() {
                     </div>
                   </div>
                   
-                  {/* Progress bar */}
                   <div className="w-64 h-2 bg-gray-700 rounded-full overflow-hidden mx-auto">
                     <div 
                       className="h-full bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-full transition-all duration-500"
@@ -562,7 +532,6 @@ export default function DesignPage() {
                     ></div>
                   </div>
                   
-                  {/* Floating DTF elements */}
                   <div className="mt-6 flex justify-center gap-4 text-3xl">
                     <span className="animate-float" style={{ animationDelay: "0s" }}>👕</span>
                     <span className="animate-float" style={{ animationDelay: "0.5s" }}>🧥</span>
@@ -570,7 +539,6 @@ export default function DesignPage() {
                   </div>
                 </div>
                 
-                {/* Show generated images as they come in */}
                 {generatedImages.length > 0 && (
                   <div className="absolute bottom-4 left-4 right-4 flex gap-2 justify-center z-20">
                     {generatedImages.map((imgUrl, index) => (
@@ -590,7 +558,6 @@ export default function DesignPage() {
               </div>
             ) : imageUrl ? (
               <div>
-                {/* Show generated variations if available */}
                 {generatedImages.length > 0 && !uploadedImage && (
                   <div className="mb-4">
                     <label className="block text-gray-700 font-semibold mb-2">
@@ -621,10 +588,8 @@ export default function DesignPage() {
                   </div>
                 )}
 
-                {/* Main preview */}
                 <div className="border-2 border-gray-200 rounded-lg overflow-hidden bg-gray-50 mb-4">
                   <div className="relative">
-                    {/* Desktop: Magnifying Lens on Hover + Click to Enlarge */}
                     <div 
                       className="relative select-none hidden md:block cursor-zoom-in"
                       onContextMenu={(e) => e.preventDefault()}
@@ -651,7 +616,6 @@ export default function DesignPage() {
                         </div>
                       </div>
                       
-                      {/* Magnifying Lens */}
                       {showLens && (
                         <div
                           className="absolute pointer-events-none border-4 border-blue-500 rounded-full overflow-hidden shadow-2xl"
@@ -673,7 +637,6 @@ export default function DesignPage() {
                       )}
                     </div>
 
-                    {/* Mobile: Click to Enlarge */}
                     <div 
                       className="relative select-none md:hidden cursor-pointer"
                       onContextMenu={(e) => e.preventDefault()}
@@ -699,14 +662,12 @@ export default function DesignPage() {
                           LIFEWEAR PRINTS
                         </div>
                       </div>
-                      {/* Click to Enlarge Badge */}
                       <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 pointer-events-none">
                         <span>🔍</span>
                         <span>Tap to Enlarge</span>
                       </div>
                     </div>
 
-                    {/* Print Quality Notice */}
                     <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
                       <p className="text-xs text-gray-700 text-center flex items-center justify-center gap-2">
                         <span className="text-lg">✨</span>
@@ -718,7 +679,6 @@ export default function DesignPage() {
                   </div>
                 </div>
 
-                {/* Enlarged Modal for Mobile */}
                 {showEnlargedModal && (
                   <div 
                     className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
@@ -774,7 +734,6 @@ export default function DesignPage() {
                   </div>
                 )}
 
-                {/* Preview/Select Apparel Button - New Flow */}
                 <div className="mt-6">
                   <button
                     onClick={() => {
@@ -813,7 +772,6 @@ export default function DesignPage() {
         </div>
       </main>
 
-      {/* Product Selection Modal */}
       <ProductSelectionModal
         isOpen={showProductSelection}
         onClose={() => setShowProductSelection(false)}
@@ -824,7 +782,6 @@ export default function DesignPage() {
         }}
       />
 
-      {/* Product Preview Modal */}
       <ProductPreviewModal
         isOpen={showProductPreview}
         product={selectedProduct}
@@ -838,7 +795,6 @@ export default function DesignPage() {
           setShowProductSelection(true);
         }}
         onAddToCart={(config: ProductConfig) => {
-          // Create cart item with all details including customization
           const cartItem = {
             id: `${config.product.id}-${Date.now()}`,
             productId: config.product.id,
@@ -846,7 +802,7 @@ export default function DesignPage() {
             price: config.dtfPrice + (config.product.basePrice * config.quantity),
             color: config.color,
             size: config.size,
-            quantity: 1, // Each cart item represents one complete order
+            quantity: 1,
             image: config.product.images[0],
             type: 'custom-dtf',
             hasCustomPrint: true,
@@ -862,7 +818,6 @@ export default function DesignPage() {
           setShowProductPreview(false);
           setSelectedProduct(null);
           
-          // Navigate to cart page
           router.push('/cart');
         }}
       />

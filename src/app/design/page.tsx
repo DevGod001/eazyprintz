@@ -60,11 +60,39 @@ export default function DesignPage() {
     size: string;
     quantity: number;
   } | null>(null);
-  const [printPlacement, setPrintPlacement] = useState<"front" | "back" | "breast-left" | "breast-right">("front");
+  const [printPlacement, setPrintPlacement] = useState<"front" | "back" | "breast-left" | "breast-right" | "custom">("front");
   const [showPlacementSelector, setShowPlacementSelector] = useState(false);
   const [showFinalPreview, setShowFinalPreview] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showApparelView, setShowApparelView] = useState<"front" | "back">("front");
+  
+  // Cart system
+  const [cart, setCart] = useState<Array<{
+    designUrl: string;
+    apparel: {
+      id: string;
+      name: string;
+      type: string;
+      basePrice: number;
+      color: string;
+      size: string;
+      quantity: number;
+    };
+    printSize: string;
+    printPlacement: string;
+    dtfPrice: number;
+    dtfQuantity: number; // Separate quantity for DTF transfers
+    mockupData: {
+      type: MockupType;
+      view: "front" | "back";
+      placement: "front" | "back" | "breast-left" | "breast-right" | "custom";
+      customPosition?: { x: number; y: number };
+      customScale?: number;
+    };
+  }>>([]);
+  const [showCart, setShowCart] = useState(false);
+  const [orderNotes, setOrderNotes] = useState("");
+  const [expandedCartPreview, setExpandedCartPreview] = useState<number | null>(null);
   
   // Magnifying lens state
   const [showLens, setShowLens] = useState(false);
@@ -122,8 +150,8 @@ export default function DesignPage() {
     { label: '12" × 17"', value: '12x17', price: 2.85 },
   ];
 
-  // Calculate price based on size and quantity
-  const calculatePrice = () => {
+  // Calculate price based on size and quantity (with optional scale for custom positioning)
+  const calculatePrice = (scalePercentage?: number) => {
     let basePrice = 1.09; // Default custom size price
     
     if (sizeType === "popular") {
@@ -136,6 +164,14 @@ export default function DesignPage() {
       const area = width * height;
       // Simple pricing: $0.10 per square inch
       basePrice = Math.max(0.37, Math.round(area * 0.10 * 100) / 100);
+    }
+    
+    // If scale percentage is provided (for custom positioning), adjust the price
+    if (scalePercentage !== undefined) {
+      // Scale affects the area quadratically (e.g., 50% scale = 25% area)
+      const scaleFactor = scalePercentage / 100;
+      const areaFactor = scaleFactor * scaleFactor;
+      basePrice = Math.max(0.37, basePrice * areaFactor);
     }
     
     // Apply quantity discounts
@@ -154,7 +190,14 @@ export default function DesignPage() {
     };
   };
 
+  // Calculate pricing - this recalculates on every render when dependencies change
   const pricing = calculatePrice();
+  
+  // Dynamic pricing for custom positioning - recalculates when customScale changes
+  // This is recalculated every render when customScale state changes
+  const customPricing = (printPlacement === "custom" && isEditingCustom) 
+    ? calculatePrice(customScale) 
+    : pricing;
 
   // Detect audience type from prompt
   const detectAudience = (promptText: string): AudienceType => {
@@ -937,7 +980,6 @@ export default function DesignPage() {
                                     }}
                                   />
                                   <svg viewBox="0 0 400 500" className="w-full h-auto" style={{ display: 'none' }}>
-                                    {/* T-Shirt Body - Back View */}
                                     <path
                                       d="M 80 80 L 120 50 L 150 50 L 150 20 Q 200 10 250 20 L 250 50 L 280 50 L 320 80 L 320 450 Q 320 480 300 480 L 100 480 Q 80 480 80 450 Z"
                                       fill="#ffffff"
@@ -2297,126 +2339,45 @@ export default function DesignPage() {
                 {showUnifiedShop && (
                   <div className="fixed inset-0 bg-black bg-opacity-90 z-50 overflow-y-auto">
                     <div className="min-h-screen flex items-center justify-center p-2 md:p-4">
-                      <div className="w-full max-w-7xl bg-white rounded-lg md:rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden my-4">
-                        {/* LEFT SIDE - LIVE PREVIEW */}
-                        <div className="w-full md:w-1/2 bg-gradient-to-br from-gray-900 via-gray-800 to-black p-4 md:p-8 flex flex-col">
+                      <div className="w-full max-w-3xl bg-white rounded-lg md:rounded-2xl shadow-2xl overflow-hidden my-4">
+                        {/* CUSTOMIZATION SECTION - Full Width */}
+                        <div className="w-full overflow-y-auto p-4 md:p-8 max-h-[90vh]">
                           <div className="flex justify-between items-center mb-4 md:mb-6">
-                            <h2 className="text-xl md:text-2xl font-bold text-white">Live Preview</h2>
+                            <h2 className="text-2xl md:text-3xl font-bold text-gray-900">🎨 Customize Your Order</h2>
                             <button
                               onClick={() => setShowUnifiedShop(false)}
-                              className="text-white hover:text-gray-300 text-3xl font-bold"
+                              className="text-gray-600 hover:text-gray-900 text-3xl font-bold"
                             >
                               ×
                             </button>
                           </div>
 
-                          {/* Front/Back Toggle */}
-                          {selectedApparel && (
-                            <div className="flex gap-2 mb-4 md:mb-6">
-                              <button
-                                onClick={() => setShowApparelView("front")}
-                                className={`flex-1 py-3 px-4 rounded-lg font-semibold transition ${
-                                  showApparelView === "front"
-                                    ? "bg-blue-600 text-white"
-                                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                                }`}
-                              >
-                                👉 Front View
-                              </button>
-                              <button
-                                onClick={() => setShowApparelView("back")}
-                                className={`flex-1 py-3 px-4 rounded-lg font-semibold transition ${
-                                  showApparelView === "back"
-                                    ? "bg-blue-600 text-white"
-                                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                                }`}
-                              >
-                                👈 Back View
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Live Apparel Preview with Design */}
-                          <div className="flex-1 flex items-center justify-center min-h-[300px] md:min-h-0">
-                            {selectedApparel ? (
-                              <div className="relative">
-                                {/* Apparel Base */}
+                          {selectedApparel ? (
+                              <div className="relative mb-6">
+                                {/* Preview Badge */}
                                 <div 
-                                  className="w-64 h-64 md:w-96 md:h-96 rounded-xl md:rounded-2xl shadow-2xl flex items-center justify-center relative overflow-hidden"
-                                  style={{ 
-                                    backgroundColor: selectedApparel.color.toLowerCase() === 'white' ? '#f3f4f6' : 
-                                                   selectedApparel.color.toLowerCase() === 'black' ? '#1f2937' :
-                                                   selectedApparel.color.toLowerCase()
-                                  }}
+                                  className="w-full p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border-2 border-blue-200"
                                 >
-                                  {/* Apparel Icon/Shape */}
-                                  <div className="text-6xl md:text-9xl opacity-20">
-                                    {selectedApparel.type === "tshirt" ? "👕" : 
-                                     selectedApparel.type === "hoodie" ? "🧥" : 
-                                     selectedApparel.type === "onesie" ? "👶" : "👔"}
-                                  </div>
-
-                                  {/* Design Placement - Real-time Preview */}
-                                  {selectedDesigns[0] && (
-                                    <div 
-                                      className="absolute"
-                                      style={{
-                                        top: printPlacement === "front" || printPlacement === "back" ? "50%" :
-                                             printPlacement === "breast-left" || printPlacement === "breast-right" ? "30%" : "50%",
-                                        left: printPlacement === "breast-left" ? "25%" :
-                                              printPlacement === "breast-right" ? "75%" : "50%",
-                                        transform: "translate(-50%, -50%)",
-                                        width: printPlacement === "front" || printPlacement === "back" ? "60%" : "25%",
-                                        maxWidth: "250px"
-                                      }}
-                                    >
-                                      <img
-                                        src={selectedDesigns[0]}
-                                        alt="Design preview"
-                                        className="w-full h-auto object-contain"
-                                        style={{
-                                          filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.15))"
-                                        }}
-                                      />
-                                      <div className="text-center mt-2 text-white text-xs font-bold bg-black bg-opacity-50 px-2 py-1 rounded">
-                                        {sizeType === 'popular' ? popularSizes.find(s => s.value === selectedPopularSize)?.label : `${customWidth}" × ${customHeight}"`}
+                                  <div className="text-center">
+                                    <p className="text-sm text-gray-700 mb-2">
+                                      <strong>✓ Preview Complete:</strong> You've already seen how your design looks on mockup
+                                    </p>
+                                    <div className="flex items-center justify-center gap-3">
+                                      <div className="text-4xl">
+                                        {selectedApparel.type === "tshirt" ? "👕" : 
+                                         selectedApparel.type === "hoodie" ? "🧥" : 
+                                         selectedApparel.type === "sweatshirt" ? "👔" :
+                                         selectedApparel.type === "polo" ? "👕" : "👶"}
+                                      </div>
+                                      <div className="text-left">
+                                        <p className="font-bold text-gray-900">{selectedApparel.name}</p>
+                                        <p className="text-sm text-gray-600">{selectedApparel.color} • Size {selectedApparel.size}</p>
                                       </div>
                                     </div>
-                                  )}
-                                </div>
-
-                                {/* View Indicator */}
-                                <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-bold">
-                                  {showApparelView === "front" ? "Front View" : "Back View"}
+                                  </div>
                                 </div>
                               </div>
-                            ) : (
-                              <div className="text-center text-gray-400">
-                                <div className="text-8xl mb-4">👕</div>
-                                <p className="text-xl">Select an apparel item to preview</p>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Placement Quick Info */}
-                          {selectedApparel && (
-                            <div className="mt-4 md:mt-6 p-3 md:p-4 bg-gray-800 rounded-lg">
-                              <p className="text-white text-xs md:text-sm">
-                                <strong>Current View:</strong> {selectedApparel.color} {selectedApparel.name} • Size {selectedApparel.size}
-                                <br />
-                                <strong>Design Placement:</strong> {printPlacement === "front" ? "Front Center" : 
-                                                                     printPlacement === "back" ? "Back Center" :
-                                                                     printPlacement === "breast-left" ? "Left Breast" : "Right Breast"}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* RIGHT SIDE - CUSTOMIZATION CONTROLS */}
-                        <div className="w-full md:w-1/2 overflow-y-auto p-4 md:p-8 max-h-[60vh] md:max-h-none">
-                          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 md:mb-6">
-                            🎨 Customize Your Order
-                          </h2>
+                            ) : null}
 
                           {/* Step 1: Select Apparel */}
                           <div className="mb-6 md:mb-8">
@@ -2505,41 +2466,38 @@ export default function DesignPage() {
                             </div>
                           )}
 
-                          {/* Step 4: Design Placement */}
+                          {/* Step 4: Placement Info (from mockup preview) */}
                           {selectedApparel && (
                             <div className="mb-6 md:mb-8">
                               <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3 md:mb-4 flex items-center gap-2">
-                                <span className="bg-blue-600 text-white w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">4</span>
+                                <span className="bg-green-600 text-white w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm">✓</span>
                                 Design Placement
                               </h3>
-                              <div className="grid grid-cols-2 gap-2 md:gap-3">
-                                {(["front", "back", "breast-left", "breast-right"] as const).map((placement) => (
-                                  <button
-                                    key={placement}
-                                    onClick={() => {
-                                      setPrintPlacement(placement);
-                                      if (placement === "back") {
-                                        setShowApparelView("back");
-                                      } else {
-                                        setShowApparelView("front");
+                              <div className="p-4 bg-green-50 rounded-lg border-2 border-green-200">
+                                <p className="text-sm text-green-900 mb-2">
+                                  <strong>✓ Already selected during mockup preview:</strong>
+                                </p>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-3xl">
+                                    {mockupPlacement === "front" ? "👉" : 
+                                     mockupPlacement === "back" ? "👈" : 
+                                     mockupPlacement === "custom" ? "✋" : "📌"}
+                                  </span>
+                                  <div>
+                                    <p className="font-bold text-gray-900">
+                                      {mockupPlacement === "front" ? "Front Center" : 
+                                       mockupPlacement === "back" ? "Back Center" :
+                                       mockupPlacement === "breast-left" ? "Left Breast" : 
+                                       mockupPlacement === "breast-right" ? "Right Breast" : "Custom Position"}
+                                    </p>
+                                    <p className="text-xs text-gray-600">
+                                      {mockupPlacement === "custom" 
+                                        ? `Custom size: ${customScale.toFixed(0)}% • Position: ${customPosition.x.toFixed(0)}%, ${customPosition.y.toFixed(0)}%`
+                                        : `Size: ${sizeType === 'popular' ? popularSizes.find(s => s.value === selectedPopularSize)?.label : `${customWidth}" × ${customHeight}"`}`
                                       }
-                                    }}
-                                    className={`p-3 md:p-4 border-2 rounded-lg transition ${
-                                      printPlacement === placement
-                                        ? "border-blue-600 bg-blue-50"
-                                        : "border-gray-300 hover:border-blue-400"
-                                    }`}
-                                  >
-                                    <div className="text-2xl md:text-3xl mb-1">
-                                      {placement === "front" ? "👉" : placement === "back" ? "👈" : "📌"}
-                                    </div>
-                                    <div className="font-semibold text-xs md:text-sm text-gray-900">
-                                      {placement === "front" ? "Front" : 
-                                       placement === "back" ? "Back" :
-                                       placement === "breast-left" ? "Left Breast" : "Right Breast"}
-                                    </div>
-                                  </button>
-                                ))}
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           )}
@@ -2575,7 +2533,7 @@ export default function DesignPage() {
                             </div>
                           )}
 
-                          {/* Order Summary & Checkout */}
+                          {/* Order Summary, Notes & Add to Cart */}
                           {selectedApparel && (
                             <div className="border-t pt-4 md:pt-6">
                               <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3 md:mb-4">Order Summary</h3>
@@ -2588,22 +2546,76 @@ export default function DesignPage() {
                                   <span className="text-sm">{selectedApparel.name} ({selectedApparel.quantity}x)</span>
                                   <span className="font-bold">${(selectedApparel.basePrice * selectedApparel.quantity).toFixed(2)}</span>
                                 </div>
+                                <div className="flex justify-between mb-2 text-xs text-gray-600">
+                                  <span>Placement:</span>
+                                  <span>{mockupPlacement === "front" ? "Front Center" : 
+                                         mockupPlacement === "back" ? "Back Center" :
+                                         mockupPlacement === "breast-left" ? "Left Breast" : 
+                                         mockupPlacement === "breast-right" ? "Right Breast" : "Custom Position"}</span>
+                                </div>
                                 <div className="border-t pt-2 mt-2 flex justify-between items-center">
-                                  <span className="text-base md:text-lg font-bold">Total:</span>
+                                  <span className="text-base md:text-lg font-bold">Item Total:</span>
                                   <span className="text-xl md:text-2xl font-bold text-green-600">
                                     ${(pricing.total + (selectedApparel.basePrice * selectedApparel.quantity)).toFixed(2)}
                                   </span>
                                 </div>
                               </div>
+
+                              {/* Order Notes */}
+                              <div className="mb-4">
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                  Special Instructions (Optional)
+                                </label>
+                                <textarea
+                                  value={orderNotes}
+                                  onChange={(e) => setOrderNotes(e.target.value)}
+                                  placeholder="Add any special instructions or notes about your order..."
+                                  rows={3}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
+                                />
+                              </div>
+
                               <button
                                 onClick={() => {
+                                  // Add to cart
+                                  const dtfPrice = mockupPlacement === "custom" ? customPricing.total : pricing.total;
+                                  setCart([...cart, {
+                                    designUrl: selectedDesigns[0],
+                                    apparel: selectedApparel,
+                                    printSize: sizeType === 'popular' ? popularSizes.find(s => s.value === selectedPopularSize)?.label || '' : `${customWidth}" × ${customHeight}"`,
+                                    printPlacement: mockupPlacement,
+                                    dtfPrice: dtfPrice,
+                                    dtfQuantity: quantity,
+                                    mockupData: {
+                                      type: mockupType,
+                                      view: mockupView,
+                                      placement: mockupPlacement,
+                                      customPosition: mockupPlacement === "custom" ? customPosition : undefined,
+                                      customScale: mockupPlacement === "custom" ? customScale : undefined,
+                                    }
+                                  }]);
                                   setShowUnifiedShop(false);
-                                  alert("Proceeding to checkout...");
+                                  setShowCart(true);
+                                  // Reset for next item
+                                  setSelectedApparel(null);
+                                  setOrderNotes("");
                                 }}
-                                className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 md:py-4 rounded-lg font-bold hover:from-green-700 hover:to-green-800 transition shadow-lg text-base md:text-lg"
+                                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 md:py-4 rounded-lg font-bold hover:from-blue-700 hover:to-blue-800 transition shadow-lg text-base md:text-lg mb-2"
                               >
-                                Proceed to Checkout 🛒
+                                🛒 Add to Cart
                               </button>
+                              
+                              {cart.length > 0 && (
+                                <button
+                                  onClick={() => {
+                                    setShowUnifiedShop(false);
+                                    setShowCart(true);
+                                  }}
+                                  className="w-full bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300 transition text-sm"
+                                >
+                                  View Cart ({cart.length} {cart.length === 1 ? 'item' : 'items'})
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -2887,6 +2899,334 @@ export default function DesignPage() {
                             <strong>🎉 Almost there!</strong> Review your order above. Shipping cost will be calculated based on your delivery address at checkout.
                           </p>
                         </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Cart Modal */}
+                {showCart && (
+                  <div className="fixed inset-0 bg-black bg-opacity-90 z-50 overflow-y-auto">
+                    <div className="min-h-screen px-4 py-8">
+                      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-2xl p-6 md:p-8">
+                        <div className="flex justify-between items-center mb-6">
+                          <h2 className="text-2xl md:text-3xl font-bold text-gray-900">🛒 Your Cart</h2>
+                          <button
+                            onClick={() => setShowCart(false)}
+                            className="text-gray-600 hover:text-gray-900 text-3xl font-bold"
+                          >
+                            ×
+                          </button>
+                        </div>
+
+                {cart.length === 0 ? (
+                          <div className="text-center py-12">
+                            <div className="text-6xl mb-4">🛒</div>
+                            <p className="text-gray-500 text-lg mb-4">Your cart is empty</p>
+                            <button
+                              onClick={() => setShowCart(false)}
+                              className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
+                            >
+                              Continue Shopping
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            {/* Cart Items */}
+                            <div className="space-y-4 mb-6">
+                              {cart.map((item, index) => (
+                                <div key={index} className="border-2 border-gray-200 rounded-lg p-4">
+                                  {/* Mockup Preview with Design - Clickable to Zoom */}
+                                  <div 
+                                    className="mb-4 cursor-pointer relative bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg overflow-hidden"
+                                    onClick={() => setExpandedCartPreview(expandedCartPreview === index ? null : index)}
+                                  >
+                                    <div className="relative p-4">
+                                      {/* Mockup Type Badge */}
+                                      <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded-full text-xs font-semibold z-10">
+                                        {item.mockupData.type === "tshirt" ? "👕" : 
+                                         item.mockupData.type === "hoodie" ? "🧥" : 
+                                         item.mockupData.type === "sweatshirt" ? "👔" :
+                                         item.mockupData.type === "onesie" ? "👶" : "🧢"}
+                                      </div>
+                                      
+                                      {/* Zoom Indicator */}
+                                      <div className="absolute top-2 right-2 bg-blue-600 bg-opacity-75 text-white px-2 py-1 rounded-full text-xs font-semibold z-10 flex items-center gap-1">
+                                        <span>🔍</span>
+                                        <span>Tap to {expandedCartPreview === index ? 'Close' : 'Zoom'}</span>
+                                      </div>
+                                      
+                                      {/* Mockup with Design */}
+                                      <div className="relative max-w-xs mx-auto">
+                                        {/* Apparel Image */}
+                                        <img
+                                          src={`/mockups/${item.mockupData.type === "onesie" ? "baby" : "adult"}/${item.mockupData.type}-${item.mockupData.view}.png`}
+                                          alt={`${item.mockupData.type} ${item.mockupData.view}`}
+                                          className="w-full h-auto"
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                          }}
+                                        />
+                                        
+                                        {/* Design Overlay */}
+                                        <div 
+                                          className="absolute"
+                                          style={{
+                                            top: item.mockupData.placement === "custom" && item.mockupData.customPosition
+                                              ? `${item.mockupData.customPosition.y}%`
+                                              : item.mockupData.placement === "front" || item.mockupData.placement === "back" ? "30%" : "25%",
+                                            left: item.mockupData.placement === "custom" && item.mockupData.customPosition
+                                              ? `${item.mockupData.customPosition.x}%`
+                                              : item.mockupData.placement === "breast-left" ? "30%" :
+                                                item.mockupData.placement === "breast-right" ? "70%" : "50%",
+                                            transform: "translate(-50%, -50%)",
+                                            width: item.mockupData.placement === "custom" && item.mockupData.customScale
+                                              ? `${item.mockupData.customScale}%`
+                                              : item.mockupData.placement === "front" || item.mockupData.placement === "back" ? "40%" : "20%",
+                                            zIndex: 5
+                                          }}
+                                        >
+                                          <img
+                                            src={item.designUrl}
+                                            alt="Design"
+                                            className="w-full h-auto object-contain"
+                                            style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.15))" }}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Item Details */}
+                                  <div className="mb-4">
+                                    <h3 className="font-bold text-gray-900 mb-2 text-lg">{item.apparel.name}</h3>
+                                    <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                                      <div>
+                                        <p><strong>Color:</strong> {item.apparel.color}</p>
+                                        <p><strong>Size:</strong> {item.apparel.size}</p>
+                                      </div>
+                                      <div>
+                                        <p><strong>Placement:</strong> {item.printPlacement === "front" ? "Front" : 
+                                                       item.printPlacement === "back" ? "Back" :
+                                                       item.printPlacement === "breast-left" ? "Left Breast" : 
+                                                       item.printPlacement === "breast-right" ? "Right Breast" : "Custom"}</p>
+                                        <p><strong>Print Size:</strong> {item.printSize}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Quantity Controls */}
+                                  <div className="mb-4 space-y-3">
+                                    {/* DTF Transfer Quantity */}
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm font-semibold text-gray-700">DTF Transfers:</span>
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() => {
+                                            const newCart = [...cart];
+                                            newCart[index].dtfQuantity = Math.max(1, newCart[index].dtfQuantity - 1);
+                                            setCart(newCart);
+                                          }}
+                                          className="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold text-gray-700"
+                                        >
+                                          −
+                                        </button>
+                                        <span className="w-12 text-center font-bold">{item.dtfQuantity}</span>
+                                        <button
+                                          onClick={() => {
+                                            const newCart = [...cart];
+                                            newCart[index].dtfQuantity += 1;
+                                            setCart(newCart);
+                                          }}
+                                          className="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold text-gray-700"
+                                        >
+                                          +
+                                        </button>
+                                        <span className="text-sm text-gray-600 ml-2">
+                                          ${(item.dtfPrice * item.dtfQuantity / quantity).toFixed(2)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Apparel Quantity */}
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm font-semibold text-gray-700">Apparel Items:</span>
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() => {
+                                            const newCart = [...cart];
+                                            newCart[index].apparel.quantity = Math.max(1, newCart[index].apparel.quantity - 1);
+                                            setCart(newCart);
+                                          }}
+                                          className="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold text-gray-700"
+                                        >
+                                          −
+                                        </button>
+                                        <span className="w-12 text-center font-bold">{item.apparel.quantity}</span>
+                                        <button
+                                          onClick={() => {
+                                            const newCart = [...cart];
+                                            newCart[index].apparel.quantity += 1;
+                                            setCart(newCart);
+                                          }}
+                                          className="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold text-gray-700"
+                                        >
+                                          +
+                                        </button>
+                                        <span className="text-sm text-gray-600 ml-2">
+                                          ${(item.apparel.basePrice * item.apparel.quantity).toFixed(2)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Price & Remove */}
+                                  <div className="flex justify-between items-center pt-3 border-t">
+                                    <button
+                                      onClick={() => setCart(cart.filter((_, i) => i !== index))}
+                                      className="text-red-600 hover:text-red-700 text-sm font-semibold"
+                                    >
+                                      🗑️ Remove Item
+                                    </button>
+                                    <div className="text-right">
+                                      <p className="text-lg font-bold text-green-600">
+                                        ${((item.dtfPrice * item.dtfQuantity / quantity) + (item.apparel.basePrice * item.apparel.quantity)).toFixed(2)}
+                                      </p>
+                                      <p className="text-xs text-gray-500">Item Total</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            
+                            {/* Expanded Cart Preview Modal */}
+                            {expandedCartPreview !== null && (
+                              <div 
+                                className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex items-center justify-center p-4"
+                                onClick={() => setExpandedCartPreview(null)}
+                              >
+                                <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-lg p-4">
+                                  <button
+                                    onClick={() => setExpandedCartPreview(null)}
+                                    className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-red-700 transition font-bold shadow-lg z-10"
+                                  >
+                                    ×
+                                  </button>
+                                  <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg p-6">
+                                    <div className="relative max-w-2xl mx-auto">
+                                      {/* Mockup Image */}
+                                      <img
+                                        src={`/mockups/${cart[expandedCartPreview].mockupData.type === "onesie" ? "baby" : "adult"}/${cart[expandedCartPreview].mockupData.type}-${cart[expandedCartPreview].mockupData.view}.png`}
+                                        alt="Enlarged mockup"
+                                        className="w-full h-auto"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                      
+                                      {/* Design Overlay */}
+                                      <div 
+                                        className="absolute"
+                                        style={{
+                                          top: cart[expandedCartPreview].mockupData.placement === "custom" && cart[expandedCartPreview].mockupData.customPosition
+                                            ? `${cart[expandedCartPreview].mockupData.customPosition.y}%`
+                                            : cart[expandedCartPreview].mockupData.placement === "front" || cart[expandedCartPreview].mockupData.placement === "back" ? "30%" : "25%",
+                                          left: cart[expandedCartPreview].mockupData.placement === "custom" && cart[expandedCartPreview].mockupData.customPosition
+                                            ? `${cart[expandedCartPreview].mockupData.customPosition.x}%`
+                                            : cart[expandedCartPreview].mockupData.placement === "breast-left" ? "30%" :
+                                              cart[expandedCartPreview].mockupData.placement === "breast-right" ? "70%" : "50%",
+                                          transform: "translate(-50%, -50%)",
+                                          width: cart[expandedCartPreview].mockupData.placement === "custom" && cart[expandedCartPreview].mockupData.customScale
+                                            ? `${cart[expandedCartPreview].mockupData.customScale}%`
+                                            : cart[expandedCartPreview].mockupData.placement === "front" || cart[expandedCartPreview].mockupData.placement === "back" ? "40%" : "20%",
+                                          zIndex: 5
+                                        }}
+                                      >
+                                        <img
+                                          src={cart[expandedCartPreview].designUrl}
+                                          alt="Design"
+                                          className="w-full h-auto object-contain"
+                                          style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.15))" }}
+                                        />
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Details */}
+                                    <div className="mt-4 text-center">
+                                      <p className="font-bold text-gray-900">{cart[expandedCartPreview].apparel.name}</p>
+                                      <p className="text-sm text-gray-600">
+                                        {cart[expandedCartPreview].apparel.color} • Size {cart[expandedCartPreview].apparel.size}
+                                      </p>
+                                      <p className="text-sm text-gray-600">
+                                        Placement: {cart[expandedCartPreview].printPlacement === "front" ? "Front Center" : 
+                                                   cart[expandedCartPreview].printPlacement === "back" ? "Back Center" :
+                                                   cart[expandedCartPreview].printPlacement === "breast-left" ? "Left Breast" : 
+                                                   cart[expandedCartPreview].printPlacement === "breast-right" ? "Right Breast" : "Custom Position"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="text-center mt-4 text-gray-600 text-sm">
+                                    Click outside to close • Pinch to zoom on mobile
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Order Notes */}
+                            <div className="mb-6">
+                              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Order Notes (Optional)
+                              </label>
+                              <textarea
+                                value={orderNotes}
+                                onChange={(e) => setOrderNotes(e.target.value)}
+                                placeholder="Add any special instructions for your entire order..."
+                                rows={3}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
+                              />
+                            </div>
+
+                            {/* Cart Summary */}
+                            <div className="border-t-2 pt-6">
+                              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                <div className="flex justify-between mb-2">
+                                  <span className="text-gray-600">Subtotal ({cart.length} {cart.length === 1 ? 'item' : 'items'}):</span>
+                                  <span className="font-bold">
+                                    ${cart.reduce((sum, item) => sum + item.dtfPrice + (item.apparel.basePrice * item.apparel.quantity), 0).toFixed(2)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between mb-2">
+                                  <span className="text-gray-600">Shipping:</span>
+                                  <span className="font-semibold">Calculated at checkout</span>
+                                </div>
+                                <div className="border-t pt-2 mt-2 flex justify-between items-center">
+                                  <span className="text-xl font-bold">Total:</span>
+                                  <span className="text-2xl font-bold text-green-600">
+                                    ${cart.reduce((sum, item) => sum + item.dtfPrice + (item.apparel.basePrice * item.apparel.quantity), 0).toFixed(2)}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">+ shipping (calculated at checkout)</p>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3">
+                                <button
+                                  onClick={() => setShowCart(false)}
+                                  className="bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
+                                >
+                                  Continue Shopping
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    alert(`Proceeding to checkout with ${cart.length} item(s)...\n\nNext: Enter shipping address and payment details.`);
+                                  }}
+                                  className="bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-lg font-bold hover:from-green-700 hover:to-green-800 transition shadow-lg"
+                                >
+                                  Checkout 🚀
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>

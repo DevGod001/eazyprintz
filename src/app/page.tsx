@@ -8,7 +8,9 @@ export default function Home() {
       <header className="bg-white shadow-sm">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">Lifewear Prints</h1>
+            <Link href="/" className="flex items-center">
+              <Image src="/logo.png" alt="TWO KINGS CO." width={200} height={80} className="h-auto w-auto max-h-24" priority />
+            </Link>
             <div className="flex gap-6">
               <a href="#products" className="text-gray-600 hover:text-gray-900">Products</a>
               <a href="#about" className="text-gray-600 hover:text-gray-900">About</a>
@@ -25,9 +27,14 @@ export default function Home() {
           <p className="text-xl mb-8 max-w-2xl mx-auto">
             Premium quality print-on-demand clothing. Design your style, we handle the rest.
           </p>
-          <Link href="/design" className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition inline-block">
-            Start Designing
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/design" className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition inline-block">
+              Start Designing
+            </Link>
+            <Link href="/shop" className="bg-green-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-green-700 transition inline-block">
+              🛍️ Shop Apparel
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -80,7 +87,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <div>
-              <h3 className="text-3xl font-bold mb-6">About Lifewear Prints</h3>
+              <h3 className="text-3xl font-bold mb-6 tracking-wider">About TWO KINGS CO.</h3>
               <p className="text-gray-600 mb-4">
                 We're passionate about helping you express yourself through custom apparel. 
                 Our print-on-demand service ensures you get exactly what you want, when you want it.
@@ -141,6 +148,7 @@ export default function Home() {
               ></textarea>
               <button 
                 type="submit"
+                suppressHydrationWarning
                 className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
               >
                 Send Message
@@ -153,7 +161,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p>&copy; 2025 Lifewear Prints. All rights reserved.</p>
+          <p>&copy; 2025 TWO KINGS CO. All rights reserved.</p>
         </div>
       </footer>
     </div>

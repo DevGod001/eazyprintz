@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import ProductSelectionModal from "@/components/ProductSelectionModal";
+import ProductPreviewModal, { ProductConfig } from "@/components/ProductPreviewModal";
+import { products } from "@/data/products";
 
 type AudienceType = "baby" | "kids" | "adult";
 type MockupType = "tshirt" | "hoodie" | "sweatshirt" | "onesie" | "hat";
@@ -48,7 +51,12 @@ export default function DesignPage() {
   const [selectedDesigns, setSelectedDesigns] = useState<string[]>([]);
   const [expandedDesign, setExpandedDesign] = useState<string | null>(null);
   
-  // Unified modal state - ONE MODAL FOR EVERYTHING
+  // New modal state for product selection flow
+  const [showProductSelection, setShowProductSelection] = useState(false);
+  const [showProductPreview, setShowProductPreview] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<typeof products[0] | null>(null);
+  
+  // Unified modal state - ONE MODAL FOR EVERYTHING (keeping for backward compatibility)
   const [showUnifiedShop, setShowUnifiedShop] = useState(false);
   const [showApparelMarketplace, setShowApparelMarketplace] = useState(false);
   const [selectedApparel, setSelectedApparel] = useState<{
@@ -2090,21 +2098,17 @@ export default function DesignPage() {
                   </div>
                 )}
 
-                {/* Add to Print Selection Button */}
-                {selectedDesigns.length === 0 && (
-                  <div className="mt-6">
-                    <button
-                      onClick={() => {
-                        if (!selectedDesigns.includes(imageUrl)) {
-                          setSelectedDesigns([...selectedDesigns, imageUrl]);
-                        }
-                      }}
-                      className="w-full bg-blue-600 text-white py-4 rounded-lg font-bold hover:bg-blue-700 transition shadow-lg flex items-center justify-center gap-2 text-lg"
-                    >
-                      ✓ Add This Design to Print Selection
-                    </button>
-                  </div>
-                )}
+                {/* Preview/Select Apparel Button - New Flow */}
+                <div className="mt-6">
+                  <button
+                    onClick={() => {
+                      setShowProductSelection(true);
+                    }}
+                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 rounded-lg font-bold hover:from-purple-700 hover:to-blue-700 transition shadow-lg flex items-center justify-center gap-2 text-lg"
+                  >
+                    👕 Preview/Select Apparel
+                  </button>
+                </div>
 
                 {/* Size Selection Section */}
                 {selectedDesigns.length > 0 && !showSizeSelection && (
@@ -3260,6 +3264,39 @@ export default function DesignPage() {
           </div>
         </div>
       </main>
+
+      {/* Product Selection Modal */}
+      <ProductSelectionModal
+        isOpen={showProductSelection}
+        onClose={() => setShowProductSelection(false)}
+        onSelectProduct={(product) => {
+          setSelectedProduct(product);
+          setShowProductSelection(false);
+          setShowProductPreview(true);
+        }}
+      />
+
+      {/* Product Preview Modal */}
+      <ProductPreviewModal
+        isOpen={showProductPreview}
+        product={selectedProduct}
+        designUrl={imageUrl}
+        onClose={() => {
+          setShowProductPreview(false);
+          setSelectedProduct(null);
+        }}
+        onChangeProduct={() => {
+          setShowProductPreview(false);
+          setShowProductSelection(true);
+        }}
+        onAddToCart={(config: ProductConfig) => {
+          // Add to cart logic - you can expand this based on your cart system
+          console.log('Adding to cart:', config);
+          alert(`Added to cart!\n\nProduct: ${config.product.name}\nColor: ${config.color}\nSize: ${config.size}\nQuantity: ${config.quantity}\nDTF Transfers: ${config.dtfQuantity}x\nTotal: $${(config.dtfPrice + (config.product.basePrice * config.quantity)).toFixed(2)}`);
+          setShowProductPreview(false);
+          setSelectedProduct(null);
+        }}
+      />
     </div>
   );
 }

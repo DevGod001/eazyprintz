@@ -26,18 +26,17 @@ export async function POST(request: NextRequest) {
       imageBuffer = Buffer.from(arrayBuffer);
     }
 
-    console.log("Processing image to remove white background...");
+    console.log("Processing image to remove background completely...");
     
-    // Process the image with Sharp to make white background transparent
-    // Using the same logic as generate-image route
+    // Process the image with Sharp to make background transparent
     const image = sharp(imageBuffer);
     const metadata = await image.metadata();
     
     console.log("Image metadata:", metadata);
     
-    // Convert background to transparent
+    // Convert background to transparent with NO remnants
     const transparentBuffer = await image
-      .ensureAlpha() // Ensure image has alpha channel
+      .ensureAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true })
       .then(({ data, info }) => {
@@ -46,30 +45,21 @@ export async function POST(request: NextRequest) {
         const height = info.height;
         const channels = info.channels;
         
-        // Sample multiple edge pixels to better detect background color
+        // Sample edge pixels to detect background color
         const samplePoints = [];
         
-        // Top edge
-        for (let x = 0; x < width; x += Math.floor(width / 10)) {
-          samplePoints.push(x * channels);
+        // Sample all four edges more comprehensively
+        for (let x = 0; x < width; x += Math.floor(width / 20)) {
+          samplePoints.push(x * channels); // Top
+          samplePoints.push(((height - 1) * width + x) * channels); // Bottom
         }
         
-        // Bottom edge
-        for (let x = 0; x < width; x += Math.floor(width / 10)) {
-          samplePoints.push(((height - 1) * width + x) * channels);
+        for (let y = 0; y < height; y += Math.floor(height / 20)) {
+          samplePoints.push(y * width * channels); // Left
+          samplePoints.push((y * width + (width - 1)) * channels); // Right
         }
         
-        // Left edge
-        for (let y = 0; y < height; y += Math.floor(height / 10)) {
-          samplePoints.push(y * width * channels);
-        }
-        
-        // Right edge
-        for (let y = 0; y < height; y += Math.floor(height / 10)) {
-          samplePoints.push((y * width + (width - 1)) * channels);
-        }
-        
-        // Calculate average background color from edge samples
+        // Calculate background color
         let bgR = 0, bgG = 0, bgB = 0;
         let validSamples = 0;
         
@@ -79,7 +69,7 @@ export async function POST(request: NextRequest) {
             const g = pixels[sample + 1];
             const b = pixels[sample + 2];
             
-            // Only use samples that are relatively uniform (likely background)
+            // Only use uniform samples
             const variance = Math.max(
               Math.abs(r - g),
               Math.abs(r - b),
@@ -101,19 +91,19 @@ export async function POST(request: NextRequest) {
           bgB = Math.round(bgB / validSamples);
         }
         
-        console.log(`Detected background color from ${validSamples} samples: RGB(${bgR}, ${bgG}, ${bgB})`);
+        console.log(`Detected background: RGB(${bgR}, ${bgG}, ${bgB}) from ${validSamples} samples`);
         
-        // Determine if background is dark or light
+        // Determine background type
         const avgBgIntensity = (bgR + bgG + bgB) / 3;
         const isDarkBackground = avgBgIntensity < 100;
         
-        // More aggressive thresholds to remove all remnants
-        const colorThreshold = isDarkBackground ? 60 : 55; // More aggressive
-        const edgeThreshold = isDarkBackground ? 90 : 85; // Much more aggressive for edges
+        // VERY AGGRESSIVE threshold to remove ALL background pixels
+        // This ensures NO remnants are left
+        const threshold = isDarkBackground ? 110 : 105;
         
-        console.log(`Background type: ${isDarkBackground ? 'dark' : 'light'}, using thresholds: ${colorThreshold}, ${edgeThreshold}`);
+        console.log(`Using aggressive threshold: ${threshold} (${isDarkBackground ? 'dark' : 'light'} background)`);
         
-        // Process all pixels
+        // Process pixels with binary decision - fully transparent or fully opaque
         let transparentPixels = 0;
         
         for (let i = 0; i < pixels.length; i += channels) {
@@ -121,37 +111,25 @@ export async function POST(request: NextRequest) {
           const g = pixels[i + 1];
           const b = pixels[i + 2];
           
-          // Calculate color distance from detected background
-          const colorDistance = Math.sqrt(
+          // Calculate distance from background
+          const distance = Math.sqrt(
             Math.pow(r - bgR, 2) +
             Math.pow(g - bgG, 2) +
             Math.pow(b - bgB, 2)
           );
           
-          // Calculate color variance (how uniform the color is)
-          const avgIntensity = (r + g + b) / 3;
-          const colorVariance = Math.max(
-            Math.abs(r - avgIntensity),
-            Math.abs(g - avgIntensity),
-            Math.abs(b - avgIntensity)
-          );
-          
-          // If pixel is very similar to background color - make it fully transparent
-          if (colorDistance < colorThreshold && colorVariance < 60) {
+          // Binary decision: similar to background = fully transparent
+          if (distance < threshold) {
             pixels[i + 3] = 0; // Fully transparent
             transparentPixels++;
-          }
-          // For edge pixels (similar but not exact match) - still make fully transparent
-          // This prevents remnants
-          else if (colorDistance < edgeThreshold && colorVariance < 90) {
-            pixels[i + 3] = 0; // Fully transparent (no gradual transparency)
-            transparentPixels++;
+          } else {
+            pixels[i + 3] = 255; // Fully opaque
           }
         }
         
-        console.log(`Made ${transparentPixels} pixels transparent or semi-transparent`);
+        console.log(`Removed ${transparentPixels} background pixels (${((transparentPixels / (pixels.length / channels)) * 100).toFixed(1)}%)`);
         
-        // Convert back to image
+        // Convert back to PNG
         return sharp(pixels, {
           raw: {
             width: info.width,
@@ -163,7 +141,7 @@ export async function POST(request: NextRequest) {
         .toBuffer();
       });
     
-    console.log("Background removed successfully, final size:", transparentBuffer.length);
+    console.log("Background removed successfully");
     
     return new NextResponse(transparentBuffer as any, {
       headers: {

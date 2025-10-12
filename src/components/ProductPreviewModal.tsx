@@ -55,6 +55,7 @@ export default function ProductPreviewModal({
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [hasManuallyAdjustedCustom, setHasManuallyAdjustedCustom] = useState(false);
   
   // Design dimensions tracking
   const [originalDesignDimensions, setOriginalDesignDimensions] = useState<{ width: number; height: number } | null>(null);
@@ -171,12 +172,29 @@ export default function ProductPreviewModal({
       // For breast placements, typically smaller (max 4-5 inches)
       return Math.min((dtfDimensions.width / APPAREL_PRINT_WIDTH) * 100, 25);
     } else {
-      // For custom placement, use the customScale
-      return customScale;
+      // For custom placement:
+      // If user has manually adjusted (taken control), use their customScale
+      // Otherwise, calculate based on DTF dimensions for dynamic updates
+      if (hasManuallyAdjustedCustom || isResizing) {
+        return customScale;
+      }
+      // Allow up to 95% to accommodate larger sizes like 12"×17"
+      return Math.min((dtfDimensions.width / APPAREL_PRINT_WIDTH) * 100, 95);
     }
   };
 
   const visualScale = calculateVisualScale();
+
+  // Sync customScale with calculated scale when DTF size changes (for custom placement)
+  // Only updates when user hasn't manually adjusted (taken control)
+  useEffect(() => {
+    if (printPlacement === 'custom' && !isResizing && !isDragging && !hasManuallyAdjustedCustom) {
+      const APPAREL_PRINT_WIDTH = 13;
+      const dtfDimensions = getCurrentDTFDimensions();
+      const calculatedScale = Math.min((dtfDimensions.width / APPAREL_PRINT_WIDTH) * 100, 95);
+      setCustomScale(calculatedScale);
+    }
+  }, [printPlacement, sizeType, selectedPopularSize, customWidth, customHeight, isResizing, isDragging, hasManuallyAdjustedCustom]);
 
   if (!isOpen || !product) return null;
 
@@ -283,8 +301,6 @@ export default function ProductPreviewModal({
                   onMouseMove={(e) => {
                     if (printPlacement === 'custom' && isEditingCustom) {
                       const rect = e.currentTarget.getBoundingClientRect();
-                      const x = e.clientX - rect.left;
-                      const y = e.clientY - rect.top;
                       
                       if (isDragging) {
                         const deltaX = e.clientX - dragStart.x;
@@ -301,7 +317,7 @@ export default function ProductPreviewModal({
                         const deltaX = e.clientX - dragStart.x;
                         const scaleChange = (deltaX / rect.width) * 100;
                         
-                        setCustomScale(prev => Math.max(15, Math.min(70, prev + scaleChange)));
+                        setCustomScale(prev => Math.max(15, Math.min(95, prev + scaleChange)));
                         setDragStart({ x: e.clientX, y: e.clientY });
                       }
                     }
@@ -311,6 +327,36 @@ export default function ProductPreviewModal({
                     setIsResizing(false);
                   }}
                   onMouseLeave={() => {
+                    setIsDragging(false);
+                    setIsResizing(false);
+                  }}
+                  onTouchMove={(e) => {
+                    if (printPlacement === 'custom' && isEditingCustom && (isDragging || isResizing)) {
+                      e.preventDefault();
+                      const touch = e.touches[0];
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      
+                      if (isDragging) {
+                        const deltaX = touch.clientX - dragStart.x;
+                        const deltaY = touch.clientY - dragStart.y;
+                        const percentX = (deltaX / rect.width) * 100;
+                        const percentY = (deltaY / rect.height) * 100;
+                        
+                        setCustomPosition(prev => ({
+                          x: Math.max(10, Math.min(90, prev.x + percentX)),
+                          y: Math.max(10, Math.min(90, prev.y + percentY))
+                        }));
+                        setDragStart({ x: touch.clientX, y: touch.clientY });
+                      } else if (isResizing) {
+                        const deltaX = touch.clientX - dragStart.x;
+                        const scaleChange = (deltaX / rect.width) * 100;
+                        
+                        setCustomScale(prev => Math.max(15, Math.min(95, prev + scaleChange)));
+                        setDragStart({ x: touch.clientX, y: touch.clientY });
+                      }
+                    }
+                  }}
+                  onTouchEnd={() => {
                     setIsDragging(false);
                     setIsResizing(false);
                   }}
@@ -345,7 +391,18 @@ export default function ProductPreviewModal({
                           e.preventDefault();
                           e.stopPropagation();
                           setIsDragging(true);
+                          setHasManuallyAdjustedCustom(true); // User has taken control
                           setDragStart({ x: e.clientX, y: e.clientY });
+                        }
+                      }}
+                      onTouchStart={(e) => {
+                        if (printPlacement === 'custom' && isEditingCustom) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const touch = e.touches[0];
+                          setIsDragging(true);
+                          setHasManuallyAdjustedCustom(true); // User has taken control
+                          setDragStart({ x: touch.clientX, y: touch.clientY });
                         }
                       }}
                     >
@@ -364,35 +421,67 @@ export default function ProductPreviewModal({
                           <div className="absolute inset-0 border-2 border-blue-500 pointer-events-none">
                             {/* Corner Handles for Resizing */}
                             <div 
-                              className="absolute -top-2 -left-2 w-4 h-4 bg-blue-500 rounded-full cursor-nwse-resize pointer-events-auto"
+                              className="absolute -top-2 -left-2 w-6 h-6 md:w-4 md:h-4 bg-blue-500 rounded-full cursor-nwse-resize pointer-events-auto touch-none"
                               onMouseDown={(e) => {
                                 e.stopPropagation();
                                 setIsResizing(true);
+                                setHasManuallyAdjustedCustom(true); // User has taken control
                                 setDragStart({ x: e.clientX, y: e.clientY });
+                              }}
+                              onTouchStart={(e) => {
+                                e.stopPropagation();
+                                const touch = e.touches[0];
+                                setIsResizing(true);
+                                setHasManuallyAdjustedCustom(true); // User has taken control
+                                setDragStart({ x: touch.clientX, y: touch.clientY });
                               }}
                             ></div>
                             <div 
-                              className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full cursor-nesw-resize pointer-events-auto"
+                              className="absolute -top-2 -right-2 w-6 h-6 md:w-4 md:h-4 bg-blue-500 rounded-full cursor-nesw-resize pointer-events-auto touch-none"
                               onMouseDown={(e) => {
                                 e.stopPropagation();
                                 setIsResizing(true);
+                                setHasManuallyAdjustedCustom(true); // User has taken control
                                 setDragStart({ x: e.clientX, y: e.clientY });
+                              }}
+                              onTouchStart={(e) => {
+                                e.stopPropagation();
+                                const touch = e.touches[0];
+                                setIsResizing(true);
+                                setHasManuallyAdjustedCustom(true); // User has taken control
+                                setDragStart({ x: touch.clientX, y: touch.clientY });
                               }}
                             ></div>
                             <div 
-                              className="absolute -bottom-2 -left-2 w-4 h-4 bg-blue-500 rounded-full cursor-nesw-resize pointer-events-auto"
+                              className="absolute -bottom-2 -left-2 w-6 h-6 md:w-4 md:h-4 bg-blue-500 rounded-full cursor-nesw-resize pointer-events-auto touch-none"
                               onMouseDown={(e) => {
                                 e.stopPropagation();
                                 setIsResizing(true);
+                                setHasManuallyAdjustedCustom(true); // User has taken control
                                 setDragStart({ x: e.clientX, y: e.clientY });
+                              }}
+                              onTouchStart={(e) => {
+                                e.stopPropagation();
+                                const touch = e.touches[0];
+                                setIsResizing(true);
+                                setHasManuallyAdjustedCustom(true); // User has taken control
+                                setDragStart({ x: touch.clientX, y: touch.clientY });
                               }}
                             ></div>
                             <div 
-                              className="absolute -bottom-2 -right-2 w-4 h-4 bg-blue-500 rounded-full cursor-nwse-resize pointer-events-auto"
+                              className="absolute -bottom-2 -right-2 w-6 h-6 md:w-4 md:h-4 bg-blue-500 rounded-full cursor-nwse-resize pointer-events-auto touch-none"
                               onMouseDown={(e) => {
                                 e.stopPropagation();
                                 setIsResizing(true);
+                                setHasManuallyAdjustedCustom(true); // User has taken control
                                 setDragStart({ x: e.clientX, y: e.clientY });
+                              }}
+                              onTouchStart={(e) => {
+                                e.stopPropagation();
+                                const touch = e.touches[0];
+                                setIsResizing(true);
+                                setHasManuallyAdjustedCustom(true); // User has taken control
+                                setDragStart({ x: touch.clientX, y: touch.clientY });
                               }}
                             ></div>
                           </div>
@@ -639,6 +728,7 @@ export default function ProductPreviewModal({
                           setIsEditingCustom(true);
                         } else {
                           setIsEditingCustom(false);
+                          setHasManuallyAdjustedCustom(false); // Reset flag when leaving custom
                         }
                       }}
                       className={`p-3 border-2 rounded-lg transition text-sm font-semibold ${

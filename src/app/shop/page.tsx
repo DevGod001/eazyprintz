@@ -26,11 +26,17 @@ function ShopContent() {
   const [showCart, setShowCart] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [modalImageIndex, setModalImageIndex] = useState(0);
+  const [isMounted, setIsMounted] = useState(false);
   const { cart, addToCart, removeFromCart, updateQuantity, getCartTotal, getCartCount } = useCart();
 
   // Color transformation state
   const [recoloredImages, setRecoloredImages] = useState<{ [key: string]: string }>({});
   const [isRecoloring, setIsRecoloring] = useState(false);
+
+  // Prevent hydration issues from browser extensions
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Dynamic color recoloring function
   const recolorImage = (imageUrl: string, targetColor: string): Promise<string> => {
@@ -225,6 +231,7 @@ function ShopContent() {
             <button
               onClick={() => setShowCart(!showCart)}
               className="relative p-2 text-gray-600 hover:text-blue-600 transition"
+              suppressHydrationWarning
             >
               <span className="text-3xl">🛒</span>
               {getCartCount() > 0 && (
@@ -236,7 +243,7 @@ function ShopContent() {
           </div>
 
           {/* Category Navigation */}
-          <nav className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
+          <nav className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide" suppressHydrationWarning>
             {categories.map(category => (
               <button
                 key={category.id}
@@ -246,6 +253,7 @@ function ShopContent() {
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
+                suppressHydrationWarning
               >
                 <span>{category.icon}</span>
                 <span className="font-medium">{category.name}</span>

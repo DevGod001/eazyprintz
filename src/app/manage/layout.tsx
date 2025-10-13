@@ -45,10 +45,12 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-gray-100">
       <AdminSidebar />
-      <main className="flex-1 overflow-auto">
-        {children}
+      <main className="flex-1 overflow-auto w-full">
+        <div className="p-4 sm:p-6 lg:p-8">
+          {children}
+        </div>
       </main>
     </div>
   );

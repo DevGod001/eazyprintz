@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Product } from '@/data/products';
 
 interface ProductPreviewModalProps {
@@ -51,11 +51,12 @@ export default function ProductPreviewModal({
   const [customHeight, setCustomHeight] = useState('10');
   const [dtfQuantity, setDtfQuantity] = useState(1);
   
-  // Drag and resize state for custom placement
+  // Drag and resize state for custom placement with touch support
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [hasManuallyAdjustedCustom, setHasManuallyAdjustedCustom] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   // Design dimensions tracking
   const [originalDesignDimensions, setOriginalDesignDimensions] = useState<{ width: number; height: number } | null>(null);
@@ -314,6 +315,38 @@ export default function ProductPreviewModal({
     }
   }, [printPlacement, sizeType, selectedPopularSize, customWidth, customHeight, isResizing, isDragging, hasManuallyAdjustedCustom]);
 
+  // Unified handler for both mouse and touch move events
+  const handlePointerMove = (clientX: number, clientY: number) => {
+    if (printPlacement === 'custom' && isEditingCustom && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      
+      if (isDragging) {
+        const deltaX = clientX - dragStart.x;
+        const deltaY = clientY - dragStart.y;
+        const percentX = (deltaX / rect.width) * 100;
+        const percentY = (deltaY / rect.height) * 100;
+        
+        setCustomPosition(prev => ({
+          x: Math.max(10, Math.min(90, prev.x + percentX)),
+          y: Math.max(10, Math.min(90, prev.y + percentY))
+        }));
+        setDragStart({ x: clientX, y: clientY });
+      } else if (isResizing) {
+        const deltaX = clientX - dragStart.x;
+        const scaleChange = (deltaX / rect.width) * 100;
+        
+        setCustomScale(prev => Math.max(15, Math.min(95, prev + scaleChange)));
+        setDragStart({ x: clientX, y: clientY });
+      }
+    }
+  };
+
+  // End dragging/resizing
+  const handlePointerEnd = () => {
+    setIsDragging(false);
+    setIsResizing(false);
+  };
+
   if (!isOpen || !product) return null;
 
   // Get current images (original or recolored)
@@ -356,54 +389,60 @@ export default function ProductPreviewModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 z-50 overflow-y-auto">
-      <div className="min-h-screen px-4 py-8">
+      <div className="min-h-screen px-2 sm:px-4 py-4 sm:py-8">
         <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-2xl">
           {/* Header */}
-          <div className="border-b p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm text-gray-500 font-semibold uppercase">{product.brand}</p>
-                <h2 className="text-3xl font-bold text-gray-900 mt-1">{product.name}</h2>
+          <div className="border-b p-3 sm:p-6">
+            <div className="flex justify-between items-start gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-gray-500 font-semibold uppercase">{product.brand}</p>
+                <h2 className="text-xl sm:text-3xl font-bold text-gray-900 mt-1 truncate">{product.name}</h2>
                 <div className="flex items-center gap-2 mt-2">
                   <div className="flex">
                     {[...Array(5)].map((_, i) => (
-                      <span key={i} className={i < Math.floor(product.rating) ? 'text-yellow-400' : 'text-gray-300'}>
+                      <span key={i} className={`text-sm sm:text-base ${i < Math.floor(product.rating) ? 'text-yellow-400' : 'text-gray-300'}`}>
                         ⭐
                       </span>
                     ))}
                   </div>
-                  <span className="text-sm text-gray-600">({product.reviews} reviews)</span>
+                  <span className="text-xs sm:text-sm text-gray-600">({product.reviews})</span>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 shrink-0">
                 <button
                   onClick={onChangeProduct}
-                  className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300 transition"
+                  className="hidden sm:block bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300 transition text-sm"
                 >
                   Change Product
                 </button>
                 <button
                   onClick={onClose}
-                  className="text-gray-600 hover:text-gray-900 text-3xl font-bold"
+                  className="text-gray-600 hover:text-gray-900 text-2xl sm:text-3xl font-bold w-8 h-8 flex items-center justify-center"
                 >
                   ×
                 </button>
               </div>
             </div>
+            <button
+              onClick={onChangeProduct}
+              className="sm:hidden w-full mt-3 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300 transition text-sm"
+            >
+              Change Product
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8 p-3 sm:p-6">
             {/* Left: Product Preview */}
             <div>
               <div className="relative bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg overflow-hidden mb-4">
                 {/* View Toggle */}
-                <div className="absolute top-4 right-4 flex gap-1 bg-black bg-opacity-75 rounded-full p-1 z-20">
+                <div className="absolute top-2 sm:top-4 right-2 sm:right-4 flex gap-1 bg-black bg-opacity-75 rounded-full p-1 z-20">
                   <button
                     onClick={() => {
                       setCurrentView('front');
                       setCurrentImageIndex(0);
                     }}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                    className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold transition ${
                       currentView === 'front'
                         ? 'bg-white text-gray-900'
                         : 'text-white hover:bg-white hover:bg-opacity-20'
@@ -416,7 +455,7 @@ export default function ProductPreviewModal({
                       setCurrentView('back');
                       setCurrentImageIndex(product.images.length >= 3 ? 2 : (product.images.length > 1 ? 1 : 0));
                     }}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                    className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold transition ${
                       currentView === 'back'
                         ? 'bg-white text-gray-900'
                         : 'text-white hover:bg-white hover:bg-opacity-20'
@@ -428,44 +467,23 @@ export default function ProductPreviewModal({
 
                 {/* Product Image with Design Overlay */}
                 <div 
-                  className={`relative p-4 ${isEditingCustom && printPlacement === 'custom' ? 'cursor-default' : 'cursor-zoom-in'}`}
+                  ref={containerRef}
+                  className={`relative p-2 sm:p-4 ${isEditingCustom && printPlacement === 'custom' ? 'cursor-default touch-none' : 'cursor-zoom-in'}`}
                   onClick={(e) => {
                     if (!isEditingCustom || printPlacement !== 'custom') {
                       setShowZoomModal(true);
                     }
                   }}
-                  onMouseMove={(e) => {
-                    if (printPlacement === 'custom' && isEditingCustom) {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      
-                      if (isDragging) {
-                        const deltaX = e.clientX - dragStart.x;
-                        const deltaY = e.clientY - dragStart.y;
-                        const percentX = (deltaX / rect.width) * 100;
-                        const percentY = (deltaY / rect.height) * 100;
-                        
-                        setCustomPosition(prev => ({
-                          x: Math.max(10, Math.min(90, prev.x + percentX)),
-                          y: Math.max(10, Math.min(90, prev.y + percentY))
-                        }));
-                        setDragStart({ x: e.clientX, y: e.clientY });
-                      } else if (isResizing) {
-                        const deltaX = e.clientX - dragStart.x;
-                        const scaleChange = (deltaX / rect.width) * 100;
-                        
-                        setCustomScale(prev => Math.max(15, Math.min(95, prev + scaleChange)));
-                        setDragStart({ x: e.clientX, y: e.clientY });
-                      }
+                  onMouseMove={(e) => handlePointerMove(e.clientX, e.clientY)}
+                  onTouchMove={(e) => {
+                    if (e.touches.length === 1) {
+                      e.preventDefault();
+                      handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
                     }
                   }}
-                  onMouseUp={() => {
-                    setIsDragging(false);
-                    setIsResizing(false);
-                  }}
-                  onMouseLeave={() => {
-                    setIsDragging(false);
-                    setIsResizing(false);
-                  }}
+                  onMouseUp={handlePointerEnd}
+                  onTouchEnd={handlePointerEnd}
+                  onMouseLeave={handlePointerEnd}
                 >
                   <img
                     src={currentImages[currentImageIndex]}
@@ -481,7 +499,7 @@ export default function ProductPreviewModal({
                   {((currentView === 'front' && ['front', 'breast-left', 'breast-right', 'custom'].includes(printPlacement)) ||
                     (currentView === 'back' && ['back', 'custom'].includes(printPlacement))) && (
                     <div
-                      className={printPlacement === 'custom' && isEditingCustom ? 'absolute cursor-move select-none' : 'absolute select-none'}
+                      className={printPlacement === 'custom' && isEditingCustom ? 'absolute cursor-move select-none touch-none' : 'absolute select-none pointer-events-none'}
                       style={{
                         top: printPlacement === 'custom' ? `${customPosition.y}%` :
                              printPlacement === 'front' || printPlacement === 'back' ? '30%' : '25%',
@@ -501,6 +519,15 @@ export default function ProductPreviewModal({
                           setDragStart({ x: e.clientX, y: e.clientY });
                         }
                       }}
+                      onTouchStart={(e) => {
+                        if (printPlacement === 'custom' && isEditingCustom && e.touches.length === 1) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsDragging(true);
+                          setHasManuallyAdjustedCustom(true);
+                          setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                        }
+                      }}
                     >
                       <img
                         src={designUrl}
@@ -514,44 +541,76 @@ export default function ProductPreviewModal({
                         <>
                           <div className="absolute inset-0 border-2 border-blue-500 pointer-events-none">
                             <div 
-                              className="absolute -top-2 -left-2 w-6 h-6 md:w-4 md:h-4 bg-blue-500 rounded-full cursor-nwse-resize pointer-events-auto touch-none"
+                              className="absolute -top-3 -left-3 w-10 h-10 sm:w-8 sm:h-8 bg-blue-500 rounded-full cursor-nwse-resize pointer-events-auto touch-none shadow-lg"
                               onMouseDown={(e) => {
                                 e.stopPropagation();
                                 setIsResizing(true);
                                 setHasManuallyAdjustedCustom(true);
                                 setDragStart({ x: e.clientX, y: e.clientY });
                               }}
+                              onTouchStart={(e) => {
+                                e.stopPropagation();
+                                if (e.touches.length === 1) {
+                                  setIsResizing(true);
+                                  setHasManuallyAdjustedCustom(true);
+                                  setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                                }
+                              }}
                             ></div>
                             <div 
-                              className="absolute -top-2 -right-2 w-6 h-6 md:w-4 md:h-4 bg-blue-500 rounded-full cursor-nesw-resize pointer-events-auto touch-none"
+                              className="absolute -top-3 -right-3 w-10 h-10 sm:w-8 sm:h-8 bg-blue-500 rounded-full cursor-nesw-resize pointer-events-auto touch-none shadow-lg"
                               onMouseDown={(e) => {
                                 e.stopPropagation();
                                 setIsResizing(true);
                                 setHasManuallyAdjustedCustom(true);
                                 setDragStart({ x: e.clientX, y: e.clientY });
                               }}
+                              onTouchStart={(e) => {
+                                e.stopPropagation();
+                                if (e.touches.length === 1) {
+                                  setIsResizing(true);
+                                  setHasManuallyAdjustedCustom(true);
+                                  setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                                }
+                              }}
                             ></div>
                             <div 
-                              className="absolute -bottom-2 -left-2 w-6 h-6 md:w-4 md:h-4 bg-blue-500 rounded-full cursor-nesw-resize pointer-events-auto touch-none"
+                              className="absolute -bottom-3 -left-3 w-10 h-10 sm:w-8 sm:h-8 bg-blue-500 rounded-full cursor-nesw-resize pointer-events-auto touch-none shadow-lg"
                               onMouseDown={(e) => {
                                 e.stopPropagation();
                                 setIsResizing(true);
                                 setHasManuallyAdjustedCustom(true);
                                 setDragStart({ x: e.clientX, y: e.clientY });
                               }}
+                              onTouchStart={(e) => {
+                                e.stopPropagation();
+                                if (e.touches.length === 1) {
+                                  setIsResizing(true);
+                                  setHasManuallyAdjustedCustom(true);
+                                  setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                                }
+                              }}
                             ></div>
                             <div 
-                              className="absolute -bottom-2 -right-2 w-6 h-6 md:w-4 md:h-4 bg-blue-500 rounded-full cursor-nwse-resize pointer-events-auto touch-none"
+                              className="absolute -bottom-3 -right-3 w-10 h-10 sm:w-8 sm:h-8 bg-blue-500 rounded-full cursor-nwse-resize pointer-events-auto touch-none shadow-lg"
                               onMouseDown={(e) => {
                                 e.stopPropagation();
                                 setIsResizing(true);
                                 setHasManuallyAdjustedCustom(true);
                                 setDragStart({ x: e.clientX, y: e.clientY });
+                              }}
+                              onTouchStart={(e) => {
+                                e.stopPropagation();
+                                if (e.touches.length === 1) {
+                                  setIsResizing(true);
+                                  setHasManuallyAdjustedCustom(true);
+                                  setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+                                }
                               }}
                             ></div>
                           </div>
                           
-                          <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+                          <div className="absolute -bottom-6 sm:-bottom-8 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-[10px] sm:text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
                             {(() => {
                               const scaleFactor = customScale / 100;
                               const APPAREL_PRINT_WIDTH = 13;
@@ -567,14 +626,14 @@ export default function ProductPreviewModal({
                   )}
                 </div>
 
-                <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-semibold">
                   🔍 Click to Zoom
                 </div>
               </div>
 
               {/* Image Thumbnails */}
               {currentImages.length > 1 && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 overflow-x-auto">
                   {currentImages.map((img, idx) => (
                     <button
                       key={idx}
@@ -582,13 +641,13 @@ export default function ProductPreviewModal({
                         setCurrentImageIndex(idx);
                         setCurrentView(idx === 0 ? 'front' : 'back');
                       }}
-                      className={`flex-1 rounded-lg border-2 overflow-hidden transition ${
+                      className={`flex-1 min-w-[80px] rounded-lg border-2 overflow-hidden transition ${
                         currentImageIndex === idx
                           ? 'border-blue-600 ring-2 ring-blue-300'
                           : 'border-gray-300 hover:border-gray-400'
                       }`}
                     >
-                      <img src={img} alt={`${selectedColor} - ${idx === 0 ? 'Front' : 'Back'}`} className="w-full h-20 object-cover" />
+                      <img src={img} alt={`${selectedColor} - ${idx === 0 ? 'Front' : 'Back'}`} className="w-full h-16 sm:h-20 object-cover" />
                     </button>
                   ))}
                 </div>
@@ -596,11 +655,11 @@ export default function ProductPreviewModal({
             </div>
 
             {/* Right: Customization Controls */}
-            <div>
-              <p className="text-gray-700 mb-6">{product.description}</p>
+            <div className="overflow-y-auto max-h-[70vh] lg:max-h-none">
+              <p className="text-sm sm:text-base text-gray-700 mb-4 sm:mb-6">{product.description}</p>
 
-              {/* Color Selection with dynamic badge */}
-              <div className="mb-6">
+              {/* Color Selection */}
+              <div className="mb-4 sm:mb-6">
                 <label className="block text-sm font-semibold text-gray-900 mb-2">
                   Color: {selectedColor}
                 </label>
@@ -609,7 +668,7 @@ export default function ProductPreviewModal({
                     <button
                       key={color.name}
                       onClick={() => setSelectedColor(color.name)}
-                      className={`w-12 h-12 rounded-lg border-2 transition ${
+                      className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg border-2 transition ${
                         selectedColor === color.name
                           ? 'border-blue-600 ring-2 ring-blue-300'
                           : 'border-gray-300 hover:border-gray-400'
@@ -622,15 +681,15 @@ export default function ProductPreviewModal({
               </div>
 
               {/* DTF Print Size Selection */}
-              <div className="mb-6 border-2 border-green-200 rounded-lg p-4 bg-green-50">
-                <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+              <div className="mb-4 sm:mb-6 border-2 border-green-200 rounded-lg p-3 sm:p-4 bg-green-50">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
                   📏 DTF Transfer Size
                 </h3>
                 
                 <div className="flex gap-2 mb-4 border-b border-gray-300">
                   <button
                     onClick={() => setSizeType('popular')}
-                    className={`flex items-center gap-2 px-4 py-2 font-semibold transition border-b-2 ${
+                    className={`flex items-center gap-2 px-3 sm:px-4 py-2 font-semibold transition border-b-2 text-sm ${
                       sizeType === 'popular'
                         ? 'border-green-600 text-green-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -640,7 +699,7 @@ export default function ProductPreviewModal({
                   </button>
                   <button
                     onClick={() => setSizeType('custom')}
-                    className={`flex items-center gap-2 px-4 py-2 font-semibold transition border-b-2 ${
+                    className={`flex items-center gap-2 px-3 sm:px-4 py-2 font-semibold transition border-b-2 text-sm ${
                       sizeType === 'custom'
                         ? 'border-green-600 text-green-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -655,7 +714,7 @@ export default function ProductPreviewModal({
                     <select
                       value={selectedPopularSize}
                       onChange={(e) => setSelectedPopularSize(e.target.value)}
-                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-900 font-medium"
+                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-900 font-medium text-sm"
                     >
                       {popularSizes.map((size) => (
                         <option key={size.value} value={size.value} className="text-gray-900 bg-white">
@@ -678,7 +737,7 @@ export default function ProductPreviewModal({
                           step="0.1"
                           min="1"
                           max="20"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 font-semibold"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 font-semibold text-sm"
                         />
                       </div>
                       <div>
@@ -690,14 +749,14 @@ export default function ProductPreviewModal({
                           step="0.1"
                           min="1"
                           max="20"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 font-semibold"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 font-semibold text-sm"
                         />
                       </div>
                     </div>
                   </div>
                 )}
 
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="mb-4 p-2 sm:p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-start justify-between gap-2 text-xs">
                     <div className="flex-1">
                       <p className="font-bold text-blue-900 mb-1">📐 Design Info:</p>
@@ -714,7 +773,7 @@ export default function ProductPreviewModal({
                       </p>
                     </div>
                     <div className="text-center">
-                      <div className="w-16 h-16 bg-white rounded border-2 border-blue-300 flex items-center justify-center relative overflow-hidden">
+                      <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white rounded border-2 border-blue-300 flex items-center justify-center relative overflow-hidden">
                         <div 
                           className="absolute bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[8px] font-bold"
                           style={{
@@ -751,7 +810,7 @@ export default function ProductPreviewModal({
                       type="number"
                       value={dtfQuantity}
                       onChange={(e) => setDtfQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-20 text-center border-2 border-gray-300 rounded-lg py-1 font-semibold text-gray-900"
+                      className="w-20 text-center border-2 border-gray-300 rounded-lg py-1 font-semibold text-gray-900 text-sm"
                     />
                     <button
                       onClick={() => setDtfQuantity(dtfQuantity + 1)}
@@ -763,19 +822,19 @@ export default function ProductPreviewModal({
                 </div>
 
                 <div className="bg-white rounded-lg p-3 border border-gray-200">
-                  <div className="flex justify-between text-sm mb-1">
+                  <div className="flex justify-between text-xs sm:text-sm mb-1">
                     <span className="text-gray-900 font-semibold">Price per transfer:</span>
                     <span className="font-bold text-gray-900">${dtfPricing.pricePerUnit}</span>
                   </div>
                   {dtfPricing.discount > 0 && (
-                    <div className="flex justify-between text-sm mb-1">
+                    <div className="flex justify-between text-xs sm:text-sm mb-1">
                       <span className="text-green-700 font-semibold">Bulk discount:</span>
                       <span className="text-green-700 font-bold">{dtfPricing.discount}% off</span>
                     </div>
                   )}
                   <div className="border-t pt-2 flex justify-between items-center">
-                    <span className="font-bold text-gray-900">DTF Total:</span>
-                    <span className="text-xl font-bold text-green-600">${dtfPricing.total}</span>
+                    <span className="font-bold text-gray-900 text-sm">DTF Total:</span>
+                    <span className="text-lg sm:text-xl font-bold text-green-600">${dtfPricing.total}</span>
                   </div>
                 </div>
 
@@ -791,7 +850,7 @@ export default function ProductPreviewModal({
               </div>
 
               {/* Print Placement */}
-              <div className="mb-6">
+              <div className="mb-4 sm:mb-6">
                 <label className="block text-sm font-semibold text-gray-900 mb-2">
                   Print Placement
                 </label>
@@ -808,7 +867,7 @@ export default function ProductPreviewModal({
                           setHasManuallyAdjustedCustom(false);
                         }
                       }}
-                      className={`p-3 border-2 rounded-lg transition text-sm font-semibold ${
+                      className={`p-2 sm:p-3 border-2 rounded-lg transition text-xs sm:text-sm font-semibold ${
                         printPlacement === placement
                           ? 'border-blue-600 bg-blue-50 text-blue-900'
                           : 'border-gray-300 hover:border-blue-400 text-gray-900'
@@ -828,7 +887,7 @@ export default function ProductPreviewModal({
                     </div>
                     <button
                       onClick={() => setIsEditingCustom(false)}
-                      className="w-full bg-green-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-700 transition"
+                      className="w-full bg-green-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-700 transition text-sm"
                     >
                       ✓ Done Editing
                     </button>
@@ -837,7 +896,7 @@ export default function ProductPreviewModal({
               </div>
 
               {/* Size Selection */}
-              <div className="mb-6">
+              <div className="mb-4 sm:mb-6">
                 <label className="block text-sm font-semibold text-gray-900 mb-2">
                   Size: {selectedSize}
                 </label>
@@ -846,7 +905,7 @@ export default function ProductPreviewModal({
                     <button
                       key={size}
                       onClick={() => setSelectedSize(size)}
-                      className={`px-4 py-2 rounded-lg border-2 font-semibold transition ${
+                      className={`px-3 sm:px-4 py-2 rounded-lg border-2 font-semibold transition text-sm ${
                         selectedSize === size
                           ? 'border-blue-600 bg-blue-50 text-blue-600'
                           : 'border-gray-300 hover:border-gray-400'
@@ -859,7 +918,7 @@ export default function ProductPreviewModal({
               </div>
 
               {/* Quantity */}
-              <div className="mb-6">
+              <div className="mb-4 sm:mb-6">
                 <label className="block text-sm font-semibold text-gray-900 mb-2">
                   Quantity
                 </label>
@@ -886,26 +945,26 @@ export default function ProductPreviewModal({
               </div>
 
               {/* Price & Add to Cart */}
-              <div className="border-t pt-6">
-                <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <div className="flex justify-between text-sm mb-2">
+              <div className="border-t pt-4 sm:pt-6">
+                <div className="bg-gray-50 rounded-lg p-3 sm:p-4 mb-4">
+                  <div className="flex justify-between text-xs sm:text-sm mb-2">
                     <span className="text-gray-900 font-semibold">DTF Transfers ({dtfQuantity}x):</span>
                     <span className="font-bold text-gray-900">${dtfPricing.total}</span>
                   </div>
-                  <div className="flex justify-between text-sm mb-2">
+                  <div className="flex justify-between text-xs sm:text-sm mb-2">
                     <span className="text-gray-900 font-semibold">Apparel ({quantity}x):</span>
                     <span className="font-bold text-gray-900">${(product.basePrice * quantity).toFixed(2)}</span>
                   </div>
                   <div className="border-t border-gray-300 pt-2 mt-2 flex justify-between items-center">
-                    <span className="text-lg font-bold text-gray-900">Grand Total:</span>
-                    <span className="text-3xl font-bold text-blue-600">
+                    <span className="text-base sm:text-lg font-bold text-gray-900">Grand Total:</span>
+                    <span className="text-2xl sm:text-3xl font-bold text-blue-600">
                       ${(dtfPricing.total + (product.basePrice * quantity)).toFixed(2)}
                     </span>
                   </div>
                 </div>
                 <button
                   onClick={handleAddToCart}
-                  className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-4 rounded-lg font-bold text-lg hover:from-green-700 hover:to-blue-700 transition shadow-lg"
+                  className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg hover:from-green-700 hover:to-blue-700 transition shadow-lg"
                 >
                   🛒 Add to Cart
                 </button>

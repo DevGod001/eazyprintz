@@ -31,6 +31,7 @@ export default function ProductsManagementPage() {
   const { products, addProduct, updateProduct, deleteProduct } = useProducts();
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [formData, setFormData] = useState<Partial<Product>>({
     name: '',
     description: '',
@@ -139,8 +140,10 @@ export default function ProductsManagementPage() {
 
     if (editingProduct) {
       updateProduct(editingProduct.id, productData);
+      showToast('Product updated successfully! ✓', 'success');
     } else {
       addProduct(productData);
+      showToast('Product added successfully! ✓', 'success');
     }
 
     resetForm();
@@ -183,11 +186,32 @@ export default function ProductsManagementPage() {
   const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to delete this product?')) {
       deleteProduct(id);
+      showToast('Product deleted successfully! ✓', 'success');
     }
+  };
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
   };
 
   return (
     <div className="p-8">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in ${
+          toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+        }`}>
+          <span className="text-lg font-semibold">{toast.message}</span>
+          <button 
+            onClick={() => setToast(null)}
+            className="ml-2 hover:opacity-75"
+          >
+            <X size={20} />
+          </button>
+        </div>
+      )}
+
       <div className="mb-8 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Product Management</h1>

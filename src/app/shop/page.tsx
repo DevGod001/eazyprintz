@@ -26,6 +26,149 @@ function ShopContent() {
   const [modalImageIndex, setModalImageIndex] = useState(0);
   const { cart, addToCart, removeFromCart, updateQuantity, getCartTotal, getCartCount } = useCart();
 
+  // Color transformation state
+  const [recoloredImages, setRecoloredImages] = useState<{ [key: string]: string }>({});
+  const [isRecoloring, setIsRecoloring] = useState(false);
+
+  // Dynamic color recoloring function
+  const recolorImage = (imageUrl: string, targetColor: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        
+        if (!ctx) {
+          resolve(imageUrl);
+          return;
+        }
+
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        try {
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+
+          const targetR = parseInt(targetColor.slice(1, 3), 16);
+          const targetG = parseInt(targetColor.slice(3, 5), 16);
+          const targetB = parseInt(targetColor.slice(5, 7), 16);
+
+          const cornerSamples: number[][] = [];
+          const sampleSize = 5;
+          
+          for (let y = 0; y < sampleSize; y++) {
+            for (let x = 0; x < sampleSize; x++) {
+              cornerSamples.push([x, y]);
+              cornerSamples.push([canvas.width - 1 - x, y]);
+              cornerSamples.push([x, canvas.height - 1 - y]);
+              cornerSamples.push([canvas.width - 1 - x, canvas.height - 1 - y]);
+            }
+          }
+
+          let bgR = 0, bgG = 0, bgB = 0, bgCount = 0;
+          cornerSamples.forEach(([x, y]) => {
+            const idx = (y * canvas.width + x) * 4;
+            if (data[idx + 3] > 200) {
+              bgR += data[idx];
+              bgG += data[idx + 1];
+              bgB += data[idx + 2];
+              bgCount++;
+            }
+          });
+
+          const bgColor = {
+            r: bgCount > 0 ? bgR / bgCount : 255,
+            g: bgCount > 0 ? bgG / bgCount : 255,
+            b: bgCount > 0 ? bgB / bgCount : 255
+          };
+
+          const isBackground = (r: number, g: number, b: number): boolean => {
+            const diff = Math.abs(r - bgColor.r) + Math.abs(g - bgColor.g) + Math.abs(b - bgColor.b);
+            return diff < 60;
+          };
+
+          for (let i = 0; i < data.length; i += 4) {
+            const red = data[i];
+            const green = data[i + 1];
+            const blue = data[i + 2];
+            const alpha = data[i + 3];
+
+            if (alpha < 10) continue;
+            if (isBackground(red, green, blue)) continue;
+
+            const luminosity = 0.299 * red + 0.587 * green + 0.114 * blue;
+            const lumFactor = luminosity / 255;
+
+            data[i] = targetR * lumFactor;
+            data[i + 1] = targetG * lumFactor;
+            data[i + 2] = targetB * lumFactor;
+          }
+
+          ctx.putImageData(imageData, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        } catch (error) {
+          console.error('Error processing image:', error);
+          resolve(imageUrl);
+        }
+      };
+
+      img.onerror = () => {
+        console.error('Error loading image');
+        resolve(imageUrl);
+      };
+
+      img.src = imageUrl;
+    });
+  };
+
+  // Recolor images when color changes
+  useEffect(() => {
+    if (!selectedProduct || !selectedColor) return;
+
+    const colorObj = selectedProduct.colors.find(c => c.name === selectedColor);
+    if (!colorObj) return;
+
+    if (colorObj.hex.toUpperCase() === '#FFFFFF') {
+      setRecoloredImages({});
+      setIsRecoloring(false);
+      return;
+    }
+
+    const recolorAllImages = async () => {
+      setIsRecoloring(true);
+      const newRecoloredImages: { [key: string]: string } = {};
+
+      for (let i = 0; i < selectedProduct.images.length; i++) {
+        const originalUrl = selectedProduct.images[i];
+        const recoloredUrl = await recolorImage(originalUrl, colorObj.hex);
+        newRecoloredImages[`image-${i}`] = recoloredUrl;
+      }
+
+      setRecoloredImages(newRecoloredImages);
+      setIsRecoloring(false);
+    };
+
+    recolorAllImages();
+  }, [selectedColor, selectedProduct]);
+
+  // Get current images (original or recolored)
+  const getCurrentImages = () => {
+    if (!selectedProduct?.images || selectedProduct.images.length === 0) {
+      return ['/products/placeholder.jpg'];
+    }
+
+    const colorObj = selectedProduct.colors.find(c => c.name === selectedColor);
+    
+    if (!colorObj || colorObj.hex.toUpperCase() === '#FFFFFF' || Object.keys(recoloredImages).length === 0) {
+      return selectedProduct.images;
+    }
+    
+    return selectedProduct.images.map((_, idx) => recoloredImages[`image-${idx}`] || selectedProduct.images[idx]);
+  };
+
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -70,6 +213,7 @@ function ShopContent() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  suppressHydrationWarning
                 />
                 <span className="absolute left-3 top-2.5 text-gray-400">🔍</span>
               </div>
@@ -283,7 +427,7 @@ function ShopContent() {
                 <div>
                   <div className="relative bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg h-96 flex items-center justify-center overflow-hidden">
                     <img
-                      src={selectedProduct.images[modalImageIndex]}
+                      src={getCurrentImages()[modalImageIndex]}
                       alt={`${selectedProduct.name} - Image ${modalImageIndex + 1}`}
                       className="w-full h-full object-contain"
                       onError={(e) => {
@@ -340,7 +484,7 @@ function ShopContent() {
                   {/* Thumbnail Navigation - Only show if multiple images */}
                   {selectedProduct.images.length > 1 && (
                     <div className="flex gap-2 mt-4 overflow-x-auto">
-                      {selectedProduct.images.map((img, idx) => (
+                      {getCurrentImages().map((img, idx) => (
                         <button
                           key={idx}
                           onClick={() => setModalImageIndex(idx)}

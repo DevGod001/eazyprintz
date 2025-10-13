@@ -4,11 +4,15 @@ export interface Product {
   description: string;
   category: 'tshirts' | 'hoodies' | 'sweatshirts' | 'polos' | 'kids' | 'baby' | 'accessories';
   basePrice: number;
-  images: string[];
+  images: string[]; // Fallback images if color doesn't have specific images
   colors: Array<{
     name: string;
     hex: string;
     available: boolean;
+    images?: {
+      front: string;
+      back: string;
+    };
   }>;
   sizes: string[];
   brand: string;

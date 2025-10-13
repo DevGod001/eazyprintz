@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/contexts/CartContext";
-
-const inter = Inter({ subsets: ["latin"] });
+import { OrderProvider } from "@/contexts/OrderContext";
+import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 
 export const metadata: Metadata = {
-  title: "TWO KINGS CO. - Custom DTF Printing",
-  description: "Professional Direct-to-Film printing service",
+  title: "Lifewear Prints - Custom DTF Printing",
+  description: "Professional Direct-to-Film printing service for custom apparel",
 };
 
 export default function RootLayout({
@@ -17,10 +16,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className} suppressHydrationWarning>
-        <CartProvider>
-          {children}
-        </CartProvider>
+      <body className="antialiased" suppressHydrationWarning>
+        <AdminAuthProvider>
+          <OrderProvider>
+            <CartProvider>
+              {children}
+            </CartProvider>
+          </OrderProvider>
+        </AdminAuthProvider>
       </body>
     </html>
   );

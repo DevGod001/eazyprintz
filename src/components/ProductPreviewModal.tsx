@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { products } from '@/data/products';
+import { Product } from '@/data/products';
 
 interface ProductPreviewModalProps {
   isOpen: boolean;
-  product: typeof products[0] | null;
+  product: Product | null;
   designUrl: string;
   onClose: () => void;
   onChangeProduct: () => void;
@@ -13,7 +13,7 @@ interface ProductPreviewModalProps {
 }
 
 export interface ProductConfig {
-  product: typeof products[0];
+  product: Product;
   color: string;
   size: string;
   quantity: number;
@@ -60,6 +60,10 @@ export default function ProductPreviewModal({
   // Design dimensions tracking
   const [originalDesignDimensions, setOriginalDesignDimensions] = useState<{ width: number; height: number } | null>(null);
 
+  // Color transformation state
+  const [recoloredImages, setRecoloredImages] = useState<{ [key: string]: string }>({});
+  const [isRecoloring, setIsRecoloring] = useState(false);
+
   // Popular sizes with pricing
   const popularSizes = [
     { label: '2" × 2"', value: '2x2', price: 0.37 },
@@ -80,6 +84,134 @@ export default function ProductPreviewModal({
     { label: '12" × 17"', value: '12x17', price: 2.85 },
   ];
 
+  // Dynamic color recoloring function
+  const recolorImage = (imageUrl: string, targetColor: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        
+        if (!ctx) {
+          resolve(imageUrl);
+          return;
+        }
+
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        try {
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+
+          // Convert target color to RGB
+          const targetR = parseInt(targetColor.slice(1, 3), 16);
+          const targetG = parseInt(targetColor.slice(3, 5), 16);
+          const targetB = parseInt(targetColor.slice(5, 7), 16);
+
+          // Detect background by sampling corners
+          const cornerSamples: number[][] = [];
+          const sampleSize = 5;
+          
+          for (let y = 0; y < sampleSize; y++) {
+            for (let x = 0; x < sampleSize; x++) {
+              cornerSamples.push([x, y]);
+              cornerSamples.push([canvas.width - 1 - x, y]);
+              cornerSamples.push([x, canvas.height - 1 - y]);
+              cornerSamples.push([canvas.width - 1 - x, canvas.height - 1 - y]);
+            }
+          }
+
+          let bgR = 0, bgG = 0, bgB = 0, bgCount = 0;
+          cornerSamples.forEach(([x, y]) => {
+            const idx = (y * canvas.width + x) * 4;
+            if (data[idx + 3] > 200) {
+              bgR += data[idx];
+              bgG += data[idx + 1];
+              bgB += data[idx + 2];
+              bgCount++;
+            }
+          });
+
+          const bgColor = {
+            r: bgCount > 0 ? bgR / bgCount : 255,
+            g: bgCount > 0 ? bgG / bgCount : 255,
+            b: bgCount > 0 ? bgB / bgCount : 255
+          };
+
+          const isBackground = (r: number, g: number, b: number): boolean => {
+            const diff = Math.abs(r - bgColor.r) + Math.abs(g - bgColor.g) + Math.abs(b - bgColor.b);
+            return diff < 60;
+          };
+
+          // Process each pixel
+          for (let i = 0; i < data.length; i += 4) {
+            const red = data[i];
+            const green = data[i + 1];
+            const blue = data[i + 2];
+            const alpha = data[i + 3];
+
+            if (alpha < 10) continue;
+            if (isBackground(red, green, blue)) continue;
+
+            const luminosity = 0.299 * red + 0.587 * green + 0.114 * blue;
+            const lumFactor = luminosity / 255;
+
+            data[i] = targetR * lumFactor;
+            data[i + 1] = targetG * lumFactor;
+            data[i + 2] = targetB * lumFactor;
+          }
+
+          ctx.putImageData(imageData, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        } catch (error) {
+          console.error('Error processing image:', error);
+          resolve(imageUrl);
+        }
+      };
+
+      img.onerror = () => {
+        console.error('Error loading image');
+        resolve(imageUrl);
+      };
+
+      img.src = imageUrl;
+    });
+  };
+
+  // Recolor images when color changes
+  useEffect(() => {
+    if (!product || !selectedColor) return;
+
+    const colorObj = product.colors.find(c => c.name === selectedColor);
+    if (!colorObj) return;
+
+    // Skip recoloring for white (use original images)
+    if (colorObj.hex.toUpperCase() === '#FFFFFF') {
+      setRecoloredImages({});
+      setIsRecoloring(false);
+      return;
+    }
+
+    const recolorAllImages = async () => {
+      setIsRecoloring(true);
+      const newRecoloredImages: { [key: string]: string } = {};
+
+      for (let i = 0; i < product.images.length; i++) {
+        const originalUrl = product.images[i];
+        const recoloredUrl = await recolorImage(originalUrl, colorObj.hex);
+        newRecoloredImages[`image-${i}`] = recoloredUrl;
+      }
+
+      setRecoloredImages(newRecoloredImages);
+      setIsRecoloring(false);
+    };
+
+    recolorAllImages();
+  }, [selectedColor, product]);
+
   // Calculate DTF price based on size and quantity
   const calculateDTFPrice = (scalePercentage?: number) => {
     let basePrice = 1.09;
@@ -94,14 +226,12 @@ export default function ProductPreviewModal({
       basePrice = Math.max(0.37, Math.round(area * 0.10 * 100) / 100);
     }
     
-    // If scale percentage is provided (for custom positioning), adjust the price
     if (scalePercentage !== undefined) {
       const scaleFactor = scalePercentage / 100;
       const areaFactor = scaleFactor * scaleFactor;
       basePrice = Math.max(0.37, basePrice * areaFactor);
     }
     
-    // Apply quantity discounts
     let discount = 0;
     if (dtfQuantity >= 250) discount = 0.50;
     else if (dtfQuantity >= 100) discount = 0.40;
@@ -132,7 +262,6 @@ export default function ProductPreviewModal({
     if (designUrl && !originalDesignDimensions) {
       const img = new Image();
       img.onload = () => {
-        // Assume 300 DPI for print quality
         const widthInches = img.width / 300;
         const heightInches = img.height / 300;
         setOriginalDesignDimensions({
@@ -144,7 +273,6 @@ export default function ProductPreviewModal({
     }
   }, [designUrl, originalDesignDimensions]);
 
-  // Get current DTF dimensions in inches
   const getCurrentDTFDimensions = () => {
     if (sizeType === 'popular') {
       const size = popularSizes.find(s => s.value === selectedPopularSize);
@@ -159,34 +287,24 @@ export default function ProductPreviewModal({
     };
   };
 
-  // Calculate visual scale percentage based on DTF size
-  // Assuming the printable area on apparel is approximately 12-14 inches wide
   const calculateVisualScale = () => {
-    const APPAREL_PRINT_WIDTH = 13; // inches - typical print area width
+    const APPAREL_PRINT_WIDTH = 13;
     const dtfDimensions = getCurrentDTFDimensions();
     
     if (printPlacement === 'front' || printPlacement === 'back') {
-      // For center placements, scale based on width
       return Math.min((dtfDimensions.width / APPAREL_PRINT_WIDTH) * 100, 70);
     } else if (printPlacement === 'breast-left' || printPlacement === 'breast-right') {
-      // For breast placements, typically smaller (max 4-5 inches)
       return Math.min((dtfDimensions.width / APPAREL_PRINT_WIDTH) * 100, 25);
     } else {
-      // For custom placement:
-      // If user has manually adjusted (taken control), use their customScale
-      // Otherwise, calculate based on DTF dimensions for dynamic updates
       if (hasManuallyAdjustedCustom || isResizing) {
         return customScale;
       }
-      // Allow up to 95% to accommodate larger sizes like 12"×17"
       return Math.min((dtfDimensions.width / APPAREL_PRINT_WIDTH) * 100, 95);
     }
   };
 
   const visualScale = calculateVisualScale();
 
-  // Sync customScale with calculated scale when DTF size changes (for custom placement)
-  // Only updates when user hasn't manually adjusted (taken control)
   useEffect(() => {
     if (printPlacement === 'custom' && !isResizing && !isDragging && !hasManuallyAdjustedCustom) {
       const APPAREL_PRINT_WIDTH = 13;
@@ -197,6 +315,25 @@ export default function ProductPreviewModal({
   }, [printPlacement, sizeType, selectedPopularSize, customWidth, customHeight, isResizing, isDragging, hasManuallyAdjustedCustom]);
 
   if (!isOpen || !product) return null;
+
+  // Get current images (original or recolored)
+  const getCurrentImages = () => {
+    if (!product?.images || product.images.length === 0) {
+      return ['/products/placeholder.jpg'];
+    }
+
+    const colorObj = product.colors.find(c => c.name === selectedColor);
+    
+    // If white or no recolored images yet, use originals
+    if (!colorObj || colorObj.hex.toUpperCase() === '#FFFFFF' || Object.keys(recoloredImages).length === 0) {
+      return product.images;
+    }
+    
+    // Use recolored images
+    return product.images.map((_, idx) => recoloredImages[`image-${idx}`] || product.images[idx]);
+  };
+
+  const currentImages = getCurrentImages();
 
   const handleAddToCart = () => {
     const printSizeString = sizeType === 'popular' 
@@ -277,7 +414,6 @@ export default function ProductPreviewModal({
                   <button
                     onClick={() => {
                       setCurrentView('back');
-                      // If 3+ images, use index 2 for back view; if 2 images, use index 1; otherwise use 0
                       setCurrentImageIndex(product.images.length >= 3 ? 2 : (product.images.length > 1 ? 1 : 0));
                     }}
                     className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
@@ -330,40 +466,10 @@ export default function ProductPreviewModal({
                     setIsDragging(false);
                     setIsResizing(false);
                   }}
-                  onTouchMove={(e) => {
-                    if (printPlacement === 'custom' && isEditingCustom && (isDragging || isResizing)) {
-                      e.preventDefault();
-                      const touch = e.touches[0];
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      
-                      if (isDragging) {
-                        const deltaX = touch.clientX - dragStart.x;
-                        const deltaY = touch.clientY - dragStart.y;
-                        const percentX = (deltaX / rect.width) * 100;
-                        const percentY = (deltaY / rect.height) * 100;
-                        
-                        setCustomPosition(prev => ({
-                          x: Math.max(10, Math.min(90, prev.x + percentX)),
-                          y: Math.max(10, Math.min(90, prev.y + percentY))
-                        }));
-                        setDragStart({ x: touch.clientX, y: touch.clientY });
-                      } else if (isResizing) {
-                        const deltaX = touch.clientX - dragStart.x;
-                        const scaleChange = (deltaX / rect.width) * 100;
-                        
-                        setCustomScale(prev => Math.max(15, Math.min(95, prev + scaleChange)));
-                        setDragStart({ x: touch.clientX, y: touch.clientY });
-                      }
-                    }
-                  }}
-                  onTouchEnd={() => {
-                    setIsDragging(false);
-                    setIsResizing(false);
-                  }}
                 >
                   <img
-                    src={product.images[currentImageIndex]}
-                    alt={`${product.name} ${currentView}`}
+                    src={currentImages[currentImageIndex]}
+                    alt={`${product.name} ${currentView} - ${selectedColor}`}
                     className="w-full h-auto"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
@@ -391,18 +497,8 @@ export default function ProductPreviewModal({
                           e.preventDefault();
                           e.stopPropagation();
                           setIsDragging(true);
-                          setHasManuallyAdjustedCustom(true); // User has taken control
+                          setHasManuallyAdjustedCustom(true);
                           setDragStart({ x: e.clientX, y: e.clientY });
-                        }
-                      }}
-                      onTouchStart={(e) => {
-                        if (printPlacement === 'custom' && isEditingCustom) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const touch = e.touches[0];
-                          setIsDragging(true);
-                          setHasManuallyAdjustedCustom(true); // User has taken control
-                          setDragStart({ x: touch.clientX, y: touch.clientY });
                         }
                       }}
                     >
@@ -414,26 +510,16 @@ export default function ProductPreviewModal({
                         draggable="false"
                       />
                       
-                      {/* Custom Position Controls - Only show when actively editing */}
                       {printPlacement === 'custom' && isEditingCustom && (
                         <>
-                          {/* Bounding Box */}
                           <div className="absolute inset-0 border-2 border-blue-500 pointer-events-none">
-                            {/* Corner Handles for Resizing */}
                             <div 
                               className="absolute -top-2 -left-2 w-6 h-6 md:w-4 md:h-4 bg-blue-500 rounded-full cursor-nwse-resize pointer-events-auto touch-none"
                               onMouseDown={(e) => {
                                 e.stopPropagation();
                                 setIsResizing(true);
-                                setHasManuallyAdjustedCustom(true); // User has taken control
+                                setHasManuallyAdjustedCustom(true);
                                 setDragStart({ x: e.clientX, y: e.clientY });
-                              }}
-                              onTouchStart={(e) => {
-                                e.stopPropagation();
-                                const touch = e.touches[0];
-                                setIsResizing(true);
-                                setHasManuallyAdjustedCustom(true); // User has taken control
-                                setDragStart({ x: touch.clientX, y: touch.clientY });
                               }}
                             ></div>
                             <div 
@@ -441,15 +527,8 @@ export default function ProductPreviewModal({
                               onMouseDown={(e) => {
                                 e.stopPropagation();
                                 setIsResizing(true);
-                                setHasManuallyAdjustedCustom(true); // User has taken control
+                                setHasManuallyAdjustedCustom(true);
                                 setDragStart({ x: e.clientX, y: e.clientY });
-                              }}
-                              onTouchStart={(e) => {
-                                e.stopPropagation();
-                                const touch = e.touches[0];
-                                setIsResizing(true);
-                                setHasManuallyAdjustedCustom(true); // User has taken control
-                                setDragStart({ x: touch.clientX, y: touch.clientY });
                               }}
                             ></div>
                             <div 
@@ -457,15 +536,8 @@ export default function ProductPreviewModal({
                               onMouseDown={(e) => {
                                 e.stopPropagation();
                                 setIsResizing(true);
-                                setHasManuallyAdjustedCustom(true); // User has taken control
+                                setHasManuallyAdjustedCustom(true);
                                 setDragStart({ x: e.clientX, y: e.clientY });
-                              }}
-                              onTouchStart={(e) => {
-                                e.stopPropagation();
-                                const touch = e.touches[0];
-                                setIsResizing(true);
-                                setHasManuallyAdjustedCustom(true); // User has taken control
-                                setDragStart({ x: touch.clientX, y: touch.clientY });
                               }}
                             ></div>
                             <div 
@@ -473,23 +545,14 @@ export default function ProductPreviewModal({
                               onMouseDown={(e) => {
                                 e.stopPropagation();
                                 setIsResizing(true);
-                                setHasManuallyAdjustedCustom(true); // User has taken control
+                                setHasManuallyAdjustedCustom(true);
                                 setDragStart({ x: e.clientX, y: e.clientY });
-                              }}
-                              onTouchStart={(e) => {
-                                e.stopPropagation();
-                                const touch = e.touches[0];
-                                setIsResizing(true);
-                                setHasManuallyAdjustedCustom(true); // User has taken control
-                                setDragStart({ x: touch.clientX, y: touch.clientY });
                               }}
                             ></div>
                           </div>
                           
-                          {/* Position & Size Indicator with actual dimensions */}
                           <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
                             {(() => {
-                              const dtfDims = getCurrentDTFDimensions();
                               const scaleFactor = customScale / 100;
                               const APPAREL_PRINT_WIDTH = 13;
                               const actualWidth = (APPAREL_PRINT_WIDTH * scaleFactor).toFixed(1);
@@ -504,16 +567,15 @@ export default function ProductPreviewModal({
                   )}
                 </div>
 
-                {/* Zoom indicator */}
                 <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white px-3 py-1 rounded-full text-xs font-semibold">
                   🔍 Click to Zoom
                 </div>
               </div>
 
-              {/* Image Thumbnails if multiple */}
-              {product.images.length > 1 && (
+              {/* Image Thumbnails */}
+              {currentImages.length > 1 && (
                 <div className="flex gap-2">
-                  {product.images.map((img, idx) => (
+                  {currentImages.map((img, idx) => (
                     <button
                       key={idx}
                       onClick={() => {
@@ -526,7 +588,7 @@ export default function ProductPreviewModal({
                           : 'border-gray-300 hover:border-gray-400'
                       }`}
                     >
-                      <img src={img} alt={`View ${idx + 1}`} className="w-full h-20 object-cover" />
+                      <img src={img} alt={`${selectedColor} - ${idx === 0 ? 'Front' : 'Back'}`} className="w-full h-20 object-cover" />
                     </button>
                   ))}
                 </div>
@@ -537,13 +599,34 @@ export default function ProductPreviewModal({
             <div>
               <p className="text-gray-700 mb-6">{product.description}</p>
 
+              {/* Color Selection with dynamic badge */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  Color: {selectedColor}
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {product.colors.map(color => (
+                    <button
+                      key={color.name}
+                      onClick={() => setSelectedColor(color.name)}
+                      className={`w-12 h-12 rounded-lg border-2 transition ${
+                        selectedColor === color.name
+                          ? 'border-blue-600 ring-2 ring-blue-300'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                      style={{ backgroundColor: color.hex }}
+                      title={color.name}
+                    />
+                  ))}
+                </div>
+              </div>
+
               {/* DTF Print Size Selection */}
               <div className="mb-6 border-2 border-green-200 rounded-lg p-4 bg-green-50">
                 <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
                   📏 DTF Transfer Size
                 </h3>
                 
-                {/* Size Type Tabs */}
                 <div className="flex gap-2 mb-4 border-b border-gray-300">
                   <button
                     onClick={() => setSizeType('popular')}
@@ -567,7 +650,6 @@ export default function ProductPreviewModal({
                   </button>
                 </div>
 
-                {/* Popular Size Dropdown */}
                 {sizeType === 'popular' && (
                   <div className="mb-4">
                     <select
@@ -584,7 +666,6 @@ export default function ProductPreviewModal({
                   </div>
                 )}
 
-                {/* Custom Size Input */}
                 {sizeType === 'custom' && (
                   <div className="mb-4">
                     <div className="grid grid-cols-2 gap-2">
@@ -616,7 +697,6 @@ export default function ProductPreviewModal({
                   </div>
                 )}
 
-                {/* Design Size Info */}
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-start justify-between gap-2 text-xs">
                     <div className="flex-1">
@@ -656,7 +736,6 @@ export default function ProductPreviewModal({
                   </p>
                 </div>
 
-                {/* DTF Quantity */}
                 <div className="mb-4">
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
                     DTF Transfer Quantity
@@ -683,7 +762,6 @@ export default function ProductPreviewModal({
                   </div>
                 </div>
 
-                {/* DTF Pricing Display */}
                 <div className="bg-white rounded-lg p-3 border border-gray-200">
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-gray-900 font-semibold">Price per transfer:</span>
@@ -701,7 +779,6 @@ export default function ProductPreviewModal({
                   </div>
                 </div>
 
-                {/* Bulk Discount Info */}
                 <div className="mt-3 p-2 bg-gradient-to-r from-green-100 to-blue-100 rounded text-xs">
                   <p className="font-bold mb-1">💰 Volume Discounts:</p>
                   <div className="grid grid-cols-2 gap-1">
@@ -728,7 +805,7 @@ export default function ProductPreviewModal({
                           setIsEditingCustom(true);
                         } else {
                           setIsEditingCustom(false);
-                          setHasManuallyAdjustedCustom(false); // Reset flag when leaving custom
+                          setHasManuallyAdjustedCustom(false);
                         }
                       }}
                       className={`p-3 border-2 rounded-lg transition text-sm font-semibold ${
@@ -757,28 +834,6 @@ export default function ProductPreviewModal({
                     </button>
                   </div>
                 )}
-              </div>
-
-              {/* Color Selection */}
-              <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Color: {selectedColor}
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {product.colors.map(color => (
-                    <button
-                      key={color.name}
-                      onClick={() => setSelectedColor(color.name)}
-                      className={`w-12 h-12 rounded-lg border-2 transition ${
-                        selectedColor === color.name
-                          ? 'border-blue-600 ring-2 ring-blue-300'
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                      style={{ backgroundColor: color.hex }}
-                      title={color.name}
-                    />
-                  ))}
-                </div>
               </div>
 
               {/* Size Selection */}
@@ -876,11 +931,10 @@ export default function ProductPreviewModal({
             <div className="bg-white rounded-lg p-4">
               <div className="relative">
                 <img
-                  src={product.images[currentImageIndex]}
-                  alt="Enlarged view"
+                  src={currentImages[currentImageIndex]}
+                  alt={`Enlarged view - ${selectedColor}`}
                   className="w-full h-auto"
                 />
-                {/* Design overlay in zoom */}
                 {((currentView === 'front' && ['front', 'breast-left', 'breast-right', 'custom'].includes(printPlacement)) ||
                   (currentView === 'back' && ['back', 'custom'].includes(printPlacement))) && (
                   <div

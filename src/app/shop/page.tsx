@@ -3,10 +3,12 @@
 import { useState, useMemo, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { products, categories } from '@/data/products';
+import { categories } from '@/data/products';
 import { useCart } from '@/contexts/CartContext';
+import { useProducts } from '@/contexts/ProductContext';
 
 function ShopContent() {
+  const { products } = useProducts();
   const searchParams = useSearchParams();
   const router = useRouter();
   const isSelectionMode = searchParams.get('mode') === 'selection';

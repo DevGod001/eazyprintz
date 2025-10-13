@@ -3,6 +3,7 @@ import "./globals.css";
 import { CartProvider } from "@/contexts/CartContext";
 import { OrderProvider } from "@/contexts/OrderContext";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
+import { ProductProvider } from "@/contexts/ProductContext";
 
 export const metadata: Metadata = {
   title: "Lifewear Prints - Custom DTF Printing",
@@ -17,13 +18,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased" suppressHydrationWarning>
-        <AdminAuthProvider>
-          <OrderProvider>
-            <CartProvider>
-              {children}
-            </CartProvider>
-          </OrderProvider>
-        </AdminAuthProvider>
+        <ProductProvider>
+          <AdminAuthProvider>
+            <OrderProvider>
+              <CartProvider>
+                {children}
+              </CartProvider>
+            </OrderProvider>
+          </AdminAuthProvider>
+        </ProductProvider>
       </body>
     </html>
   );

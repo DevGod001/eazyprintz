@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from 'react';
-import { products, categories } from '@/data/products';
+import { categories } from '@/data/products';
+import { useProducts } from '@/contexts/ProductContext';
+import { Product } from '@/data/products';
 
 interface ProductSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectProduct: (product: typeof products[0]) => void;
+  onSelectProduct: (product: Product) => void;
 }
 
 export default function ProductSelectionModal({ isOpen, onClose, onSelectProduct }: ProductSelectionModalProps) {
+  const { products } = useProducts();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
